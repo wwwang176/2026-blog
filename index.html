@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Cheng Wei, Wang — Front-End / Back-End / Web Game</title>
+  <meta name="description" content="Cheng Wei, Wang. Front-End and Back-End developer based in Taiwan. Passionate about CSS, JavaScript, PHP and web game design with three.js." />
+  <meta name="theme-color" content="#08080a" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Cheng Wei, Wang" />
+  <meta property="og:description" content="Front-End and Back-End developer based in Taiwan." />
+
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2308080a'/><circle cx='16' cy='16' r='6' fill='%23ff5c26'/></svg>" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet" />
+
+  <script type="module" src="/src/main.js"></script>
+</head>
+
+<body>
+  <!-- ── Loader ─────────────────────────────────────────────── -->
+  <div class="loader" id="loader" role="status" aria-live="polite">
+    <div class="loader__inner">
+      <span class="loader__label">Cheng Wei, Wang</span>
+      <div class="loader__bar"><span class="loader__fill" id="loader-fill"></span></div>
+      <span class="loader__pct" id="loader-pct">0</span>
+    </div>
+  </div>
+
+  <!-- ── WebGL canvas (fixed, full-screen) ──────────────────── -->
+  <canvas class="webgl" id="webgl" aria-hidden="true"></canvas>
+  <div class="fallback-bg" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <!-- ── Header ─────────────────────────────────────────────── -->
+  <header class="site-header">
+    <a class="site-header__mark" href="#hero">CW<span>.</span></a>
+    <nav class="site-header__nav" aria-label="Primary">
+      <a href="#brief">Brief</a>
+      <a href="#works">Works</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </header>
+
+  <main id="main">
+
+    <!-- ── Hero ─────────────────────────────────────────────── -->
+    <section class="section section--hero" id="hero" data-stage="0">
+      <div class="hero__meta">
+        <span class="mono">Based in Taiwan</span>
+        <span class="mono" id="clock">—</span>
+      </div>
+
+      <h1 class="hero__title">
+        <span class="line"><span class="line__inner" data-split>Cheng Wei,</span></span>
+        <span class="line"><span class="line__inner" data-split>Wang</span></span>
+      </h1>
+
+      <div class="hero__foot">
+        <p class="hero__roles mono" data-intro>
+          Front-End<span class="sep">/</span>Back-End<span class="sep">/</span>Web&nbsp;Game
+        </p>
+        <a class="scroll-cue" href="#brief" data-intro>
+          <span class="mono">Scroll</span>
+          <span class="scroll-cue__line" aria-hidden="true"></span>
+        </a>
+      </div>
+    </section>
+
+    <!-- ── Brief ────────────────────────────────────────────── -->
+    <section class="section section--brief" id="brief" data-stage="1">
+      <p class="section__label mono" data-fade>(01) — Brief</p>
+
+      <div class="brief__body">
+        <p class="brief__lead" data-reveal>
+          I'm extremely passionate about <em>Front-End programming</em>
+          (CSS, jQuery&nbsp;/&nbsp;JavaScript) and <em>Back-End programming</em> (PHP),
+          and also interested in <em>Web game design</em> — built with three.js and Cannon.js.
+        </p>
+        <p class="brief__sub" data-reveal>
+          Additionally, I'm learning about photography, Arduino
+          and other interesting things.
+        </p>
+      </div>
+
+      <ul class="brief__stack" data-stagger>
+        <li class="mono">CSS</li>
+        <li class="mono">JavaScript</li>
+        <li class="mono">jQuery</li>
+        <li class="mono">PHP</li>
+        <li class="mono">three.js</li>
+        <li class="mono">Cannon.js</li>
+        <li class="mono">Arduino</li>
+        <li class="mono">Photography</li>
+      </ul>
+    </section>
+
+    <!-- ── Works ────────────────────────────────────────────── -->
+    <section class="section section--works" id="works" data-stage="2">
+      <div class="works__head">
+        <p class="section__label mono" data-fade>(02) — Works</p>
+        <div class="parallax-slow">
+          <h2 class="works__title" data-reveal>Selected<br />Works</h2>
+        </div>
+      </div>
+
+      <!-- Populated from src/data/works.js -->
+      <div class="works__grid" id="works-grid"></div>
+    </section>
+
+    <!-- ── Contact ──────────────────────────────────────────── -->
+    <section class="section section--contact" id="contact" data-stage="3">
+      <p class="section__label mono" data-fade>(03) — Contact</p>
+
+      <div class="parallax-slow">
+        <h2 class="contact__title" data-reveal>Let's<br />talk</h2>
+      </div>
+
+      <p class="contact__intro" data-reveal>
+        If you have any question, feel free to contact me below or email me.
+        I will get back to you as soon as I can.
+      </p>
+
+      <form class="contact__form" id="contact-form" novalidate>
+        <div class="field">
+          <label class="mono" for="f-name">Name</label>
+          <input id="f-name" name="name" type="text" autocomplete="name" required />
+          <span class="field__line" aria-hidden="true"></span>
+        </div>
+
+        <div class="field">
+          <label class="mono" for="f-mail">Mail</label>
+          <input id="f-mail" name="mail" type="email" autocomplete="email" required />
+          <span class="field__line" aria-hidden="true"></span>
+        </div>
+
+        <div class="field field--area">
+          <label class="mono" for="f-message">Message</label>
+          <textarea id="f-message" name="message" rows="3" required></textarea>
+          <span class="field__line" aria-hidden="true"></span>
+        </div>
+
+        <button class="btn" type="submit">
+          <span class="btn__text">Send message</span>
+          <span class="btn__fill" aria-hidden="true"></span>
+        </button>
+
+        <p class="form-status mono" id="form-status" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+  </main>
+
+  <!-- ── Footer ───────────────────────────────────────────── -->
+  <footer class="site-footer">
+    <p class="mono">Create by Cheng Wei, Wang © 2026</p>
+    <a class="mono" href="#hero">Back to top ↑</a>
+  </footer>
+</body>
+</html>
