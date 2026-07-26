@@ -15,7 +15,6 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
 
 import { runLoader } from "../ui/loader.js";
-import { initContact } from "../ui/contact.js";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -451,7 +450,6 @@ function setupPage() {
   bindAnchors();
   bindTilt();
   bindFilters();
-  initContact();
   startClock();
 
   ScrollTrigger.refresh();

@@ -3,6 +3,7 @@ import { getCollection } from "astro:content";
 
 import BaseLayout from "../layouts/BaseLayout.astro";
 import WorkCard from "../components/WorkCard.astro";
+import { CONTACT_LINKS } from "../data/links";
 
 const works = (await getCollection("works"))
   .filter((w) => w.data.featured)
@@ -124,36 +125,30 @@ const dateFmt = new Intl.DateTimeFormat("en-GB", {
       </div>
 
       <p class="contact__intro" data-reveal>
-        If you have any question, feel free to contact me below or email me.
+        If you have any question, feel free to email me or find me below.
         I will get back to you as soon as I can.
       </p>
 
-      <form class="contact__form" id="contact-form" novalidate>
-        <div class="field">
-          <label class="mono" for="f-name">Name</label>
-          <input id="f-name" name="name" type="text" autocomplete="name" required />
-          <span class="field__line" aria-hidden="true"></span>
-        </div>
-
-        <div class="field">
-          <label class="mono" for="f-mail">Mail</label>
-          <input id="f-mail" name="mail" type="email" autocomplete="email" required />
-          <span class="field__line" aria-hidden="true"></span>
-        </div>
-
-        <div class="field field--area">
-          <label class="mono" for="f-message">Message</label>
-          <textarea id="f-message" name="message" rows="3" required></textarea>
-          <span class="field__line" aria-hidden="true"></span>
-        </div>
-
-        <button class="btn" type="submit">
-          <span class="btn__text">Send message</span>
-          <span class="btn__fill" aria-hidden="true"></span>
-        </button>
-
-        <p class="form-status mono" id="form-status" role="status" aria-live="polite"></p>
-      </form>
+      <ul class="contact-links" data-stagger>
+        {
+          CONTACT_LINKS.map((link) => {
+            const external = link.href.startsWith("http");
+            return (
+              <li class="contact-link">
+                <a
+                  href={link.href}
+                  target={external ? "_blank" : undefined}
+                  rel={external ? "noopener noreferrer" : undefined}
+                >
+                  <span class="contact-link__label mono">{link.label}</span>
+                  <span class="contact-link__value">{link.value}</span>
+                  <span class="arrow" aria-hidden="true">↗</span>
+                </a>
+              </li>
+            );
+          })
+        }
+      </ul>
     </section>
   </main>
 </BaseLayout>

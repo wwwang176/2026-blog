@@ -205,9 +205,17 @@ src/
 public/             static assets, served from the site root
 ```
 
-## Contact form
+## Contact links
 
-Submission opens the visitor's mail client. Everything outward-facing is inside
-`deliver()` in `src/ui/contact.js` — to move to Formspree, Web3Forms or your own
-API, replace that one function. GitHub Pages is static-only, so a third-party
-endpoint is the only option short of moving hosts.
+The Contact section renders `CONTACT_LINKS` from `src/data/links.ts` — no form,
+no backend, nothing to maintain. Add, remove or reorder entries there:
+
+```ts
+{ label: "GitHub", value: "github.com/handle", href: "https://github.com/handle" }
+```
+
+`value` is what the visitor reads; `href` is where it goes. Anything starting
+with `http` opens in a new tab automatically, `mailto:` links don't.
+
+The GitHub and CodePen entries currently point at `your-username` placeholders
+and need replacing.
