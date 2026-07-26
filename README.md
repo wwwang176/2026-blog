@@ -209,7 +209,7 @@ src/
   components/
     Header.astro, Footer.astro
     CardGrid.astro  grid wrapper; caps width by card count
-    WorkCard.astro, PostCard.astro
+    WorkCard.astro
     blocks/         content blocks usable from .mdx
   content/
     works/          ← project content
