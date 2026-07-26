@@ -759,17 +759,51 @@ main {
 }
 
 .post-row a {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(7rem, auto) 1fr auto;
   align-items: baseline;
   /* No row gap — the description supplies its own top margin. */
   gap: 0 clamp(1rem, 4vw, 3rem);
-  padding: clamp(1.4rem, 3vw, 2.1rem) 0;
-  transition: padding-left 0.5s var(--ease-out);
+  padding: clamp(1.4rem, 3vw, 2.1rem) clamp(1rem, 2vw, 1.5rem);
+  margin: 0 clamp(-1rem, -2vw, -1.5rem);
+  overflow: hidden;
+  transform-style: preserve-3d;
+  will-change: transform;
+  transition: padding-left 0.5s var(--ease-out), background-color 0.6s var(--ease-out);
 }
 
 .post-row a:hover {
-  padding-left: 1rem;
+  padding-left: clamp(2rem, 3.5vw, 2.75rem);
+  background: rgba(21, 21, 27, 0.55);
+}
+
+/* Accent wash that follows the cursor — the same idea as the cards, stretched
+   wide and kept fainter so it reads across a full-width row. */
+.post-row__glow {
+  position: absolute;
+  width: 34rem;
+  height: 22rem;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 92, 38, 0.13), transparent 64%);
+  opacity: 0;
+  transition: opacity 0.5s var(--ease-out);
+  transform: translate(-50%, -50%);
+}
+
+.post-row a:hover .post-row__glow {
+  opacity: 1;
+}
+
+/* Positioned so they paint above the absolutely-positioned glow. */
+.post-row time,
+.post-row__title,
+.post-row .arrow,
+.post-row__desc {
+  position: relative;
 }
 
 .post-row__title {

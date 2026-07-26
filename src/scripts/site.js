@@ -347,6 +347,10 @@ function bindTilt() {
     const glow = card.querySelector("[data-tilt-glow]");
     if (!glow) return;
 
+    // `data-tilt="2"` overrides the maximum angle. Wide, short elements need a
+    // much smaller one than cards, or the perspective skews them badly.
+    const maxTilt = Number(card.dataset.tilt) || 9;
+
     const setRotX = gsap.quickTo(card, "rotationX", { duration: 0.6, ease: "power3.out" });
     const setRotY = gsap.quickTo(card, "rotationY", { duration: 0.6, ease: "power3.out" });
     const setGlowX = gsap.quickTo(glow, "x", { duration: 0.7, ease: "power3.out" });
@@ -357,8 +361,8 @@ function bindTilt() {
     card.addEventListener("pointermove", (e) => {
       if (e.pointerType === "touch") return;
       const r = card.getBoundingClientRect();
-      setRotY(((e.clientX - r.left) / r.width - 0.5) * 9);
-      setRotX((0.5 - (e.clientY - r.top) / r.height) * 9);
+      setRotY(((e.clientX - r.left) / r.width - 0.5) * maxTilt);
+      setRotX((0.5 - (e.clientY - r.top) / r.height) * maxTilt);
       setGlowX(e.clientX - r.left);
       setGlowY(e.clientY - r.top);
     });

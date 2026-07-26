@@ -1,0 +1,36 @@
+---
+import type { CollectionEntry } from "astro:content";
+
+interface Props {
+  entry: CollectionEntry<"journal">;
+  /** Heading level, so the row fits the page's outline. */
+  as?: "h2" | "h3";
+  /** The landing page shows titles only; the full listing adds the blurb. */
+  showDesc?: boolean;
+}
+
+const { entry, as: Heading = "h2", showDesc = false } = Astro.props;
+const { title, description, date } = entry.data;
+
+const dateFmt = new Intl.DateTimeFormat("en-GB", {
+  year: "numeric",
+  month: "short",
+  day: "2-digit",
+});
+---
+
+<li class="post-row">
+  <!--
+    A far shallower tilt than the cards use: these rows are wide and short, so
+    the same angle would throw the left and right edges wildly out of scale.
+  -->
+  <a href={`/journal/${entry.id}/`} data-tilt="2">
+    <span class="post-row__glow" aria-hidden="true" data-tilt-glow></span>
+
+    <time class="mono" datetime={date.toISOString()}>{dateFmt.format(date)}</time>
+    <Heading class="post-row__title">{title}</Heading>
+    <span class="arrow" aria-hidden="true">↗</span>
+
+    {showDesc && <p class="post-row__desc">{description}</p>}
+  </a>
+</li>
