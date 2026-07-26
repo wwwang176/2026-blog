@@ -1,0 +1,64 @@
+---
+interface Props {
+  title?: string;
+  items: string[];
+}
+
+const { title, items } = Astro.props;
+---
+
+<section class="block block--steps">
+  {title && <h2 class="block__title">{title}</h2>}
+
+  <ol class="steps">
+    {
+      items.map((item, i) => (
+        <li class="step">
+          <span class="step__num mono">{String(i + 1).padStart(2, "0")}</span>
+          <p class="step__text">{item}</p>
+        </li>
+      ))
+    }
+  </ol>
+</section>
+
+<style>
+  .block {
+    margin: clamp(3.5rem, 9vw, 6.5rem) 0;
+  }
+
+  .block__title {
+    margin: 0 0 clamp(1.5rem, 3vw, 2.25rem);
+    font-size: clamp(1.5rem, 3.5vw, 2.5rem);
+    font-weight: 500;
+    letter-spacing: -0.025em;
+  }
+
+  .steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-width: 46rem;
+    border-top: 1px solid var(--line-soft);
+  }
+
+  .step {
+    display: grid;
+    grid-template-columns: 3rem 1fr;
+    gap: clamp(0.75rem, 2vw, 1.5rem);
+    padding: clamp(1.1rem, 2.5vw, 1.6rem) 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .step__num {
+    color: var(--accent);
+    padding-top: 0.35em;
+  }
+
+  .step__text {
+    margin: 0;
+    font-size: clamp(0.98rem, 1.6vw, 1.12rem);
+    line-height: 1.6;
+    color: var(--fg-dim);
+  }
+</style>

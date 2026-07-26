@@ -1,0 +1,103 @@
+---
+interface Column {
+  title: string;
+  steps: string[];
+}
+
+interface Props {
+  before: Column;
+  after: Column;
+}
+
+const { before, after } = Astro.props;
+const columns = [
+  { ...before, variant: "before" },
+  { ...after, variant: "after" },
+];
+---
+
+<section class="block block--compare">
+  <div class="compare">
+    {
+      columns.map((col) => (
+        <div class:list={["compare__col", `is-${col.variant}`]}>
+          <h3 class="compare__title mono">{col.title}</h3>
+          <ol class="compare__steps">
+            {col.steps.map((step, i) => (
+              <li>
+                <span class="compare__num mono">{String(i + 1).padStart(2, "0")}</span>
+                <span class="compare__text">{step}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ))
+    }
+  </div>
+</section>
+
+<style>
+  .block {
+    margin: clamp(3.5rem, 9vw, 6.5rem) 0;
+  }
+
+  .compare {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
+    gap: 1px;
+    background: var(--line-soft);
+    border: 1px solid var(--line-soft);
+  }
+
+  .compare__col {
+    background: rgba(15, 15, 19, 0.55);
+    padding: clamp(1.5rem, 3.5vw, 2.5rem);
+  }
+
+  .compare__col.is-after {
+    background: rgba(24, 18, 15, 0.65);
+  }
+
+  .compare__title {
+    margin: 0 0 clamp(1.25rem, 3vw, 1.75rem);
+    color: var(--muted);
+  }
+
+  .compare__col.is-after .compare__title {
+    color: var(--accent);
+  }
+
+  .compare__steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.9rem;
+  }
+
+  .compare__steps li {
+    display: grid;
+    grid-template-columns: 2.25rem 1fr;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+
+  .compare__num {
+    color: var(--muted);
+    font-size: 0.65rem;
+  }
+
+  .compare__col.is-after .compare__num {
+    color: var(--accent);
+  }
+
+  .compare__text {
+    font-size: clamp(0.95rem, 1.5vw, 1.05rem);
+    line-height: 1.5;
+    color: var(--fg-dim);
+  }
+
+  .compare__col.is-after .compare__text {
+    color: var(--fg);
+  }
+</style>

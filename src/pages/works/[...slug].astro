@@ -1,0 +1,105 @@
+---
+import { getCollection, render } from "astro:content";
+import type { GetStaticPaths } from "astro";
+
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import * as blocks from "../../components/blocks";
+import { categoryLabel, categoryStage } from "../../data/categories";
+
+export const getStaticPaths = (async () => {
+  const works = (await getCollection("works")).sort((a, b) => a.data.order - b.data.order);
+
+  return works.map((entry, i) => ({
+    params: { slug: entry.id },
+    props: {
+      entry,
+      // Wraps around, so the last project points back at the first.
+      next: works[(i + 1) % works.length],
+    },
+  }));
+}) satisfies GetStaticPaths;
+
+const { entry, next } = Astro.props;
+const { title, category, year, overview, role, coworkers, link, cover } = entry.data;
+const { Content } = await render(entry);
+
+const statusLabel: Record<string, string> = {
+  deprecated: "Deprecated",
+  demo: "Demo",
+  live: "Live",
+};
+---
+
+<BaseLayout title={title} description={overview}>
+  <main id="main" data-scene="static" data-scene-stage={categoryStage(category)}>
+    <article>
+      <header class="work-hero">
+        <p class="section__label mono" data-fade>{categoryLabel(category)}</p>
+
+        <h1 class="work-hero__title" data-reveal>{title}</h1>
+
+        <dl class="work-meta">
+          <div class="work-meta__row">
+            <dt class="mono">Role</dt>
+            <dd>{role}</dd>
+          </div>
+
+          {
+            coworkers.length > 0 && (
+              <div class="work-meta__row">
+                <dt class="mono">Co-Worker</dt>
+                <dd>{coworkers.join(", ")}</dd>
+              </div>
+            )
+          }
+
+          {
+            (link.url || link.label) && (
+              <div class="work-meta__row">
+                <dt class="mono">Website</dt>
+                <dd>
+                  {link.url ? (
+                    <a
+                      class="work-meta__link"
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {link.label || link.url}
+                      <span class="arrow" aria-hidden="true">↗</span>
+                    </a>
+                  ) : (
+                    <span>{link.label}</span>
+                  )}
+                  {link.status !== "none" && <span class="tag">{statusLabel[link.status]}</span>}
+                </dd>
+              </div>
+            )
+          }
+
+          {
+            year && (
+              <div class="work-meta__row">
+                <dt class="mono">Year</dt>
+                <dd>{year}</dd>
+              </div>
+            )
+          }
+        </dl>
+
+        {cover && <img class="work-cover" src={cover} alt="" />}
+
+        <p class="work-overview" data-reveal>{overview}</p>
+      </header>
+
+      <div class="work-body">
+        <Content components={blocks} />
+      </div>
+    </article>
+
+    <a class="next-work" href={`/works/${next.id}/`}>
+      <span class="mono">Next project</span>
+      <h2 class="next-work__title">{next.data.title}</h2>
+    </a>
+  </main>
+</BaseLayout>

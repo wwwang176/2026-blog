@@ -1,0 +1,110 @@
+---
+import { getCollection, render } from "astro:content";
+import type { GetStaticPaths } from "astro";
+
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import * as blocks from "../../components/blocks";
+
+export const getStaticPaths = (async () => {
+  const posts = (await getCollection("journal", ({ data }) => !data.draft)).sort(
+    (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
+  );
+
+  return posts.map((entry, i) => ({
+    params: { slug: entry.id },
+    props: { entry, next: posts[i + 1] ?? null },
+  }));
+}) satisfies GetStaticPaths;
+
+const { entry, next } = Astro.props;
+const { title, date, description, tags } = entry.data;
+const { Content } = await render(entry);
+
+const dateFmt = new Intl.DateTimeFormat("en-GB", {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+---
+
+<BaseLayout title={title} description={description}>
+  <main id="main" data-scene="static" data-scene-stage="1">
+    <article>
+      <header class="article-hero">
+        <p class="section__label mono" data-fade>
+          <time datetime={date.toISOString()}>{dateFmt.format(date)}</time>
+        </p>
+
+        <h1 class="article-hero__title" data-reveal>{title}</h1>
+
+        <p class="article-hero__desc" data-reveal>{description}</p>
+
+        {
+          tags.length > 0 && (
+            <ul class="article-tags" aria-label="Tags">
+              {tags.map((tag) => (
+                <li class="mono">{tag}</li>
+              ))}
+            </ul>
+          )
+        }
+      </header>
+
+      <div class="article-body">
+        <Content components={blocks} />
+      </div>
+    </article>
+
+    {
+      next && (
+        <a class="next-work" href={`/journal/${next.id}/`}>
+          <span class="mono">Next post</span>
+          <h2 class="next-work__title">{next.data.title}</h2>
+        </a>
+      )
+    }
+  </main>
+</BaseLayout>
+
+<style>
+  .article-hero {
+    padding: clamp(8rem, 20vh, 12rem) var(--gutter) 0;
+  }
+
+  .article-hero__title {
+    margin: 0 0 clamp(1.25rem, 3vw, 2rem);
+    max-width: 22ch;
+    font-weight: 700;
+    font-size: clamp(2.25rem, 7vw, 5rem);
+    line-height: 0.98;
+    letter-spacing: -0.04em;
+  }
+
+  .article-hero__desc {
+    margin: 0;
+    max-width: 42rem;
+    font-size: clamp(1.1rem, 2.2vw, 1.5rem);
+    line-height: 1.45;
+    color: var(--fg-dim);
+  }
+
+  .article-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    list-style: none;
+    margin: clamp(1.75rem, 4vw, 2.5rem) 0 0;
+    padding: 0;
+  }
+
+  .article-tags li {
+    padding: 0.4rem 0.85rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--fg-dim);
+  }
+
+  .article-body {
+    padding: clamp(3rem, 8vw, 5rem) var(--gutter) clamp(4rem, 10vw, 7rem);
+  }
+</style>

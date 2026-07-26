@@ -1,0 +1,61 @@
+---
+interface Item {
+  title: string;
+  body: string;
+}
+
+interface Props {
+  items: Item[];
+}
+
+const { items } = Astro.props;
+---
+
+<section class="block block--features">
+  <div class="features">
+    {
+      items.map((item) => (
+        <article class="feature">
+          <h3 class="feature__title">{item.title}</h3>
+          <p class="feature__body">{item.body}</p>
+        </article>
+      ))
+    }
+  </div>
+</section>
+
+<style>
+  .block {
+    margin: clamp(3.5rem, 9vw, 6.5rem) 0;
+  }
+
+  .features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
+    gap: clamp(2rem, 5vw, 3.5rem);
+  }
+
+  .feature__title {
+    margin: 0 0 0.85rem;
+    font-size: clamp(1.2rem, 2.4vw, 1.6rem);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+
+  .feature__title::before {
+    content: "";
+    display: block;
+    width: 1.75rem;
+    height: 2px;
+    margin-bottom: 1rem;
+    background: var(--accent);
+  }
+
+  .feature__body {
+    margin: 0;
+    max-width: 34ch;
+    font-size: clamp(0.95rem, 1.5vw, 1.05rem);
+    line-height: 1.6;
+    color: var(--fg-dim);
+  }
+</style>

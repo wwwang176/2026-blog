@@ -1,0 +1,159 @@
+---
+import { getCollection } from "astro:content";
+
+import BaseLayout from "../layouts/BaseLayout.astro";
+import WorkCard from "../components/WorkCard.astro";
+
+const works = (await getCollection("works"))
+  .filter((w) => w.data.featured)
+  .sort((a, b) => a.data.order - b.data.order);
+
+const posts = (await getCollection("journal", ({ data }) => !data.draft))
+  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())
+  .slice(0, 3);
+
+const dateFmt = new Intl.DateTimeFormat("en-GB", {
+  year: "numeric",
+  month: "short",
+  day: "2-digit",
+});
+---
+
+<BaseLayout title="Cheng Wei, Wang — Front-End / Back-End / Web Game" rawTitle>
+  <main id="main" data-scene="scroll">
+    <!-- ── Hero ─────────────────────────────────────────── -->
+    <section class="section section--hero" id="hero" data-stage="0">
+      <div class="hero__meta">
+        <span class="mono">Based in Taiwan</span>
+        <span class="mono" id="clock">—</span>
+      </div>
+
+      <h1 class="hero__title">
+        <span class="line"><span class="line__inner">Cheng Wei,</span></span>
+        <span class="line"><span class="line__inner">Wang</span></span>
+      </h1>
+
+      <div class="hero__foot">
+        <p class="hero__roles mono" data-intro>
+          Front-End<span class="sep">/</span>Back-End<span class="sep">/</span>Web&nbsp;Game
+        </p>
+        <a class="scroll-cue" href="#brief" data-intro>
+          <span class="mono">Scroll</span>
+          <span class="scroll-cue__line" aria-hidden="true"></span>
+        </a>
+      </div>
+    </section>
+
+    <!-- ── Brief ────────────────────────────────────────── -->
+    <section class="section section--brief" id="brief" data-stage="1">
+      <p class="section__label mono" data-fade>(01) — Brief</p>
+
+      <div class="brief__body">
+        <p class="brief__lead" data-reveal>
+          I'm extremely passionate about <em>Front-End programming</em>
+          (CSS, jQuery&nbsp;/&nbsp;JavaScript) and <em>Back-End programming</em> (PHP),
+          and also interested in <em>Web game design</em> — built with three.js and Cannon.js.
+        </p>
+        <p class="brief__sub" data-reveal>
+          Additionally, I'm learning about photography, Arduino
+          and other interesting things.
+        </p>
+      </div>
+
+      <ul class="brief__stack" data-stagger>
+        <li class="mono">CSS</li>
+        <li class="mono">JavaScript</li>
+        <li class="mono">jQuery</li>
+        <li class="mono">PHP</li>
+        <li class="mono">three.js</li>
+        <li class="mono">Cannon.js</li>
+        <li class="mono">Arduino</li>
+        <li class="mono">Photography</li>
+      </ul>
+    </section>
+
+    <!-- ── Works ────────────────────────────────────────── -->
+    <section class="section section--works" id="works" data-stage="2">
+      <div class="works__head">
+        <p class="section__label mono" data-fade>(02) — Works</p>
+        <div class="parallax-slow">
+          <h2 class="works__title" data-reveal>Selected<br />Works</h2>
+        </div>
+      </div>
+
+      <div class="works__grid" data-cards>
+        {works.map((entry, i) => <WorkCard entry={entry} index={i} />)}
+      </div>
+
+      <a class="section__more mono" href="/works/">
+        All works <span class="arrow" aria-hidden="true">↗</span>
+      </a>
+    </section>
+
+    <!-- ── Journal ──────────────────────────────────────── -->
+    <section class="section section--journal" id="journal">
+      <p class="section__label mono" data-fade>(03) — Journal</p>
+
+      <ul class="post-list" data-stagger>
+        {
+          posts.map((post) => (
+            <li class="post-row">
+              <a href={`/journal/${post.id}/`}>
+                <time class="mono" datetime={post.data.date.toISOString()}>
+                  {dateFmt.format(post.data.date)}
+                </time>
+                <h3 class="post-row__title">{post.data.title}</h3>
+                <span class="arrow" aria-hidden="true">↗</span>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+
+      <a class="section__more mono" href="/journal/">
+        All posts <span class="arrow" aria-hidden="true">↗</span>
+      </a>
+    </section>
+
+    <!-- ── Contact ──────────────────────────────────────── -->
+    <section class="section section--contact" id="contact" data-stage="3">
+      <p class="section__label mono" data-fade>(04) — Contact</p>
+
+      <div class="parallax-slow">
+        <h2 class="contact__title" data-reveal>Let's<br />talk</h2>
+      </div>
+
+      <p class="contact__intro" data-reveal>
+        If you have any question, feel free to contact me below or email me.
+        I will get back to you as soon as I can.
+      </p>
+
+      <form class="contact__form" id="contact-form" novalidate>
+        <div class="field">
+          <label class="mono" for="f-name">Name</label>
+          <input id="f-name" name="name" type="text" autocomplete="name" required />
+          <span class="field__line" aria-hidden="true"></span>
+        </div>
+
+        <div class="field">
+          <label class="mono" for="f-mail">Mail</label>
+          <input id="f-mail" name="mail" type="email" autocomplete="email" required />
+          <span class="field__line" aria-hidden="true"></span>
+        </div>
+
+        <div class="field field--area">
+          <label class="mono" for="f-message">Message</label>
+          <textarea id="f-message" name="message" rows="3" required></textarea>
+          <span class="field__line" aria-hidden="true"></span>
+        </div>
+
+        <button class="btn" type="submit">
+          <span class="btn__text">Send message</span>
+          <span class="btn__fill" aria-hidden="true"></span>
+        </button>
+
+        <p class="form-status mono" id="form-status" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+  </main>
+</BaseLayout>

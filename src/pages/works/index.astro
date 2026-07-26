@@ -1,0 +1,47 @@
+---
+import { getCollection } from "astro:content";
+
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import WorkCard from "../../components/WorkCard.astro";
+import { CATEGORY_KEYS, categoryLabel } from "../../data/categories";
+
+const works = (await getCollection("works")).sort((a, b) => a.data.order - b.data.order);
+
+// Only offer filters for categories that actually have entries.
+const used = CATEGORY_KEYS.filter((key) => works.some((w) => w.data.category === key));
+---
+
+<BaseLayout
+  title="Works"
+  description="Selected work by Cheng Wei, Wang — websites, web games, print and motion pieces, and Arduino prototypes."
+>
+  <main id="main" data-scene="static" data-scene-stage="2">
+    <section class="section section--page">
+      <p class="section__label mono" data-fade>Works</p>
+
+      <div class="parallax-slow">
+        <h1 class="page__title" data-reveal>Selected<br />Works</h1>
+      </div>
+
+      <div class="filters" data-filters>
+        <button class="filter mono is-active" data-filter="all" type="button">
+          All <span class="filter__count">{works.length}</span>
+        </button>
+        {
+          used.map((key) => (
+            <button class="filter mono" data-filter={key} type="button">
+              {categoryLabel(key)}
+              <span class="filter__count">
+                {works.filter((w) => w.data.category === key).length}
+              </span>
+            </button>
+          ))
+        }
+      </div>
+
+      <div class="works__grid" data-cards>
+        {works.map((entry, i) => <WorkCard entry={entry} index={i} />)}
+      </div>
+    </section>
+  </main>
+</BaseLayout>

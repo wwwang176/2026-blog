@@ -7,8 +7,13 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 /**
  * Counts up while fonts settle, then wipes away.
  * Resolves once the page is ready for the intro animation.
+ *
+ * @param {object}   opts
+ * @param {boolean}  opts.reduced  Skip the loader entirely.
+ * @param {Promise[]} opts.waitFor Extra work to finish before the wipe —
+ *                                 the deferred three.js chunk, typically.
  */
-export function runLoader({ reduced = false } = {}) {
+export function runLoader({ reduced = false, waitFor = [] } = {}) {
   const loader = document.getElementById("loader");
   const fill = document.getElementById("loader-fill");
   const pct = document.getElementById("loader-pct");
@@ -38,6 +43,7 @@ export function runLoader({ reduced = false } = {}) {
   const ready = Promise.all([
     document.fonts ? document.fonts.ready : Promise.resolve(),
     wait(MIN_VISIBLE_MS),
+    ...waitFor,
   ]);
 
   return ready.then(

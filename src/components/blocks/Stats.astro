@@ -1,0 +1,73 @@
+---
+interface Item {
+  value: string;
+  label: string;
+}
+
+interface Props {
+  title?: string;
+  /** Shown once beneath the group, e.g. "2009 Feb — 2011 Jan". */
+  period?: string;
+  items: Item[];
+}
+
+const { title, period, items } = Astro.props;
+---
+
+<section class="block block--stats">
+  {title && <h2 class="block__title">{title}</h2>}
+
+  <dl class="stats">
+    {
+      items.map((item) => (
+        <div class="stat">
+          <dt class="stat__value">{item.value}</dt>
+          <dd class="stat__label mono">{item.label}</dd>
+        </div>
+      ))
+    }
+  </dl>
+
+  {period && <p class="stats__period mono">{period}</p>}
+</section>
+
+<style>
+  .block {
+    margin: clamp(3.5rem, 9vw, 6.5rem) 0;
+  }
+
+  .block__title {
+    margin: 0 0 clamp(1.5rem, 3vw, 2.25rem);
+    font-size: clamp(1.5rem, 3.5vw, 2.5rem);
+    font-weight: 500;
+    letter-spacing: -0.025em;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(13rem, 100%), 1fr));
+    gap: clamp(1.75rem, 4vw, 3rem);
+    margin: 0;
+    padding: clamp(1.75rem, 4vw, 2.5rem) 0;
+    border-top: 1px solid var(--line-soft);
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .stat__value {
+    font-size: clamp(2rem, 5.5vw, 3.75rem);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat__label {
+    margin: 0.7rem 0 0;
+    color: var(--muted);
+  }
+
+  .stats__period {
+    margin: 1rem 0 0;
+    color: var(--muted);
+  }
+</style>

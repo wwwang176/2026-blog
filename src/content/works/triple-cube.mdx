@@ -1,0 +1,50 @@
+---
+title: Triple Cube
+category: web-game
+year: ""
+overview: >-
+  A web game built for the Da-Yeh University music festival. Players face off
+  against each other — join a game, wait for a friend to be ready, and take
+  the stage.
+role: Programming, Game design
+coworkers: []
+link:
+  url: ""
+  label: "Demo"
+  status: demo
+featured: true
+order: 4
+---
+
+<Prose title="Player vs. Player">
+
+You play against a pre-recorded run of someone else playing Triple Cube. The
+system records how fast your fingers place cubes on the map.
+
+</Prose>
+
+{/*
+  TODO: the original page had a "Player profile" image here.
+  Drop it in public/works/triple-cube/ and uncomment:
+
+  <Figure src="/works/triple-cube/profile.jpg" caption="Player profile" />
+*/}
+
+<Steps
+  title="How to play"
+  items={[
+    "Pull the cube. Line up three to clear them, score points, and drop stones onto the other player's map.",
+    "Cube facing the wrong way? Click it to find the right direction.",
+    "Pull a cube into the trash can to discard it.",
+    "Map filling up with stones? Use a bomb to clear the ones eating your space.",
+    "Sixty seconds per round. Highest score wins.",
+  ]}
+/>
+
+<Prose title="Pre-recorded and A.I.">
+
+When you finish a round, the system records your finger speed as you place
+cubes on the map. When another player is paired with you, the A.I. plays
+against them on your behalf, driven by that recorded speed.
+
+</Prose>

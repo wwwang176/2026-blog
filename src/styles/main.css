@@ -8,7 +8,9 @@
   --bg-elev: #0f0f13;
   --fg: #f2f0ec;
   --fg-dim: #a3a3ad;
-  --muted: #6e6e7a;
+  /* Lightened from #6e6e7a — at 11px the old value only hit 3.97:1 on --bg,
+     below the 4.5:1 WCAG AA threshold. This measures 4.8:1. */
+  --muted: #7c7c88;
   --line: rgba(242, 240, 236, 0.12);
   --line-soft: rgba(242, 240, 236, 0.06);
   --accent: #ff5c26;
@@ -148,6 +150,15 @@ body.webgl-fallback .fallback-bg {
 
 .loader.is-done {
   pointer-events: none;
+}
+
+/*
+ * The loader is a first-visit affordance. Once the runtime has booted it sets
+ * <html data-visited>, and every subsequent page render hides the markup before
+ * it can paint — no flash between view transitions.
+ */
+html[data-visited] .loader {
+  display: none;
 }
 
 .loader__inner {
@@ -672,6 +683,402 @@ main {
 
 .site-footer a:hover {
   color: var(--fg);
+}
+
+/* ── Interior pages (lists and detail) ──────────────────── */
+
+.section--page {
+  min-height: auto;
+  justify-content: flex-start;
+  padding-top: clamp(8rem, 20vh, 12rem);
+}
+
+.page__title {
+  margin: 0;
+  font-weight: 700;
+  font-size: clamp(2.5rem, 9vw, 7.5rem);
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+}
+
+.section__more {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  align-self: flex-start;
+  margin-top: clamp(2rem, 5vw, 3rem);
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--line);
+  color: var(--fg-dim);
+  transition: color 0.4s var(--ease-out), border-color 0.4s var(--ease-out);
+}
+
+.section__more:hover {
+  color: var(--fg);
+  border-color: var(--accent);
+}
+
+.section__more .arrow,
+.work-card__cta .arrow,
+.post-row .arrow {
+  display: inline-block;
+  transition: transform 0.5s var(--ease-out);
+}
+
+.section__more:hover .arrow {
+  transform: translate(3px, -3px);
+}
+
+/* ── Category filters ───────────────────────────────────── */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: clamp(2.5rem, 6vw, 4rem) 0 clamp(1.5rem, 4vw, 2.5rem);
+}
+
+.filter {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.5rem 1.05rem;
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition: color 0.35s var(--ease-out), border-color 0.35s var(--ease-out),
+    background-color 0.35s var(--ease-out);
+}
+
+.filter:hover {
+  color: var(--fg);
+  border-color: var(--fg-dim);
+}
+
+.filter.is-active {
+  color: var(--bg);
+  background: var(--fg);
+  border-color: var(--fg);
+}
+
+.filter__count {
+  font-size: 0.62rem;
+  opacity: 0.55;
+}
+
+.work-card[hidden] {
+  display: none;
+}
+
+/* ── Journal list ───────────────────────────────────────── */
+
+.post-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.post-row {
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.post-row a {
+  display: grid;
+  grid-template-columns: minmax(7rem, auto) 1fr auto;
+  align-items: baseline;
+  /* No row gap — the description supplies its own top margin. */
+  gap: 0 clamp(1rem, 4vw, 3rem);
+  padding: clamp(1.4rem, 3vw, 2.1rem) 0;
+  transition: padding-left 0.5s var(--ease-out);
+}
+
+.post-row a:hover {
+  padding-left: 1rem;
+}
+
+.post-row__title {
+  margin: 0;
+  font-size: clamp(1.15rem, 2.4vw, 1.75rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.post-row a:hover .arrow {
+  transform: translate(3px, -3px);
+}
+
+.post-row__desc {
+  grid-column: 2 / -1;
+  margin: 0.4rem 0 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--fg-dim);
+  max-width: 46ch;
+}
+
+@media (max-width: 640px) {
+  .post-row a {
+    grid-template-columns: 1fr auto;
+  }
+
+  .post-row time {
+    grid-column: 1 / -1;
+  }
+
+  .post-row__desc {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ── Work card refinements ──────────────────────────────── */
+
+.work-card__index {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.work-card__year {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.work-card__desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Work detail ────────────────────────────────────────── */
+
+.work-hero {
+  padding: clamp(8rem, 20vh, 12rem) var(--gutter) 0;
+}
+
+.work-hero__title {
+  margin: 0 0 clamp(1.5rem, 4vw, 2.5rem);
+  font-weight: 700;
+  font-size: clamp(2.75rem, 10vw, 8rem);
+  line-height: 0.88;
+  letter-spacing: -0.045em;
+  text-transform: uppercase;
+}
+
+.work-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+  gap: clamp(1.25rem, 3vw, 2rem);
+  padding: clamp(1.75rem, 4vw, 2.5rem) 0;
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.work-meta__row dt {
+  margin-bottom: 0.5rem;
+}
+
+.work-meta__row dd {
+  margin: 0;
+  font-size: clamp(0.95rem, 1.5vw, 1.1rem);
+  line-height: 1.5;
+}
+
+.work-meta__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 2px;
+  transition: border-color 0.4s var(--ease-out);
+}
+
+.work-meta__link:hover {
+  border-color: var(--accent);
+}
+
+.tag {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  vertical-align: middle;
+}
+
+.work-cover {
+  width: 100%;
+  margin: clamp(2.5rem, 6vw, 4rem) 0 0;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.work-overview {
+  margin: clamp(3rem, 7vw, 5rem) 0 0;
+  max-width: 52rem;
+  font-size: clamp(1.25rem, 3vw, 2.4rem);
+  line-height: 1.24;
+  letter-spacing: -0.02em;
+  font-weight: 500;
+}
+
+.work-body {
+  padding: clamp(3rem, 8vw, 6rem) var(--gutter) clamp(4rem, 10vw, 7rem);
+}
+
+/*
+ * Bare markdown inside .mdx content — anything not wrapped in a block
+ * component still needs a readable measure and the right rhythm.
+ */
+.work-body > p,
+.work-body > ul,
+.work-body > ol,
+.work-body > blockquote,
+.article-body > p,
+.article-body > ul,
+.article-body > ol,
+.article-body > blockquote {
+  max-width: 42rem;
+  margin: 0 0 1.15em;
+  font-size: clamp(1rem, 1.6vw, 1.15rem);
+  line-height: 1.68;
+  color: var(--fg-dim);
+}
+
+.work-body > h2,
+.article-body > h2 {
+  max-width: 42rem;
+  margin: clamp(2.5rem, 6vw, 4rem) 0 1rem;
+  font-size: clamp(1.5rem, 3.5vw, 2.5rem);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+
+.work-body > h3,
+.article-body > h3 {
+  max-width: 42rem;
+  margin: clamp(2rem, 4vw, 2.75rem) 0 0.75rem;
+  font-size: clamp(1.15rem, 2.2vw, 1.5rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.work-body > ul,
+.work-body > ol,
+.article-body > ul,
+.article-body > ol {
+  padding-left: 1.25rem;
+}
+
+.work-body li,
+.article-body li {
+  margin-bottom: 0.5em;
+}
+
+.work-body a,
+.article-body a {
+  color: var(--fg);
+  border-bottom: 1px solid var(--line);
+  transition: border-color 0.4s var(--ease-out);
+}
+
+.work-body a:hover,
+.article-body a:hover {
+  border-color: var(--accent);
+}
+
+.work-body :not(pre) > code,
+.article-body :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  background: rgba(242, 240, 236, 0.08);
+  color: var(--fg);
+}
+
+.work-body pre,
+.article-body pre {
+  max-width: 52rem;
+  margin: clamp(1.5rem, 3vw, 2rem) 0;
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.work-body blockquote,
+.article-body blockquote {
+  padding-left: 1.25rem;
+  border-left: 2px solid var(--accent);
+}
+
+.work-body table,
+.article-body table {
+  width: 100%;
+  max-width: 52rem;
+  margin: clamp(1.5rem, 3vw, 2rem) 0;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.work-body th,
+.work-body td,
+.article-body th,
+.article-body td {
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--line-soft);
+  text-align: left;
+}
+
+.work-body th,
+.article-body th {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ── Next project ───────────────────────────────────────── */
+
+.next-work {
+  display: block;
+  padding: clamp(3rem, 8vw, 5rem) var(--gutter);
+  border-top: 1px solid var(--line-soft);
+  transition: background-color 0.6s var(--ease-out);
+}
+
+.next-work:hover {
+  background: rgba(21, 21, 27, 0.6);
+}
+
+.next-work__title {
+  margin: 0.75rem 0 0;
+  font-weight: 700;
+  font-size: clamp(2rem, 6vw, 4.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+  transition: transform 0.6s var(--ease-out);
+}
+
+.next-work:hover .next-work__title {
+  transform: translateX(0.75rem);
 }
 
 /* ── Focus visibility ───────────────────────────────────── */

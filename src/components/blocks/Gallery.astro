@@ -1,0 +1,53 @@
+---
+interface Item {
+  src: string;
+  caption?: string;
+  alt?: string;
+}
+
+interface Props {
+  items: Item[];
+}
+
+const { items } = Astro.props;
+---
+
+<section class="block block--gallery">
+  <div class="gallery">
+    {
+      items.map((item) => (
+        <figure class="gallery__item">
+          <img src={item.src} alt={item.alt ?? ""} loading="lazy" decoding="async" />
+          {item.caption && <figcaption class="mono">{item.caption}</figcaption>}
+        </figure>
+      ))
+    }
+  </div>
+</section>
+
+<style>
+  .block {
+    margin: clamp(3.5rem, 9vw, 6.5rem) 0;
+  }
+
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
+    gap: clamp(1rem, 2.5vw, 2rem);
+  }
+
+  .gallery__item {
+    margin: 0;
+  }
+
+  .gallery__item img {
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--line-soft);
+  }
+
+  figcaption {
+    margin-top: 0.75rem;
+    color: var(--muted);
+  }
+</style>

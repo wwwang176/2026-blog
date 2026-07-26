@@ -1,0 +1,92 @@
+---
+import { ClientRouter } from "astro:transitions";
+
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+import "../styles/main.css";
+
+interface Props {
+  title: string;
+  description?: string;
+  /** Suppresses the " — Cheng Wei, Wang" suffix when the title is already full. */
+  rawTitle?: boolean;
+}
+
+const {
+  title,
+  description = "Cheng Wei, Wang. Front-End and Back-End developer based in Taiwan. Passionate about CSS, JavaScript, PHP and web game design with three.js.",
+  rawTitle = false,
+} = Astro.props;
+
+const fullTitle = rawTitle ? title : `${title} — Cheng Wei, Wang`;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta name="theme-color" content="#08080a" />
+    <meta name="generator" content={Astro.generator} />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <link rel="alternate" type="application/rss+xml" title="Journal — Cheng Wei, Wang" href="/rss.xml" />
+
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2308080a'/><circle cx='16' cy='16' r='6' fill='%23ff5c26'/></svg>"
+    />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+
+    <ClientRouter />
+  </head>
+
+  <body>
+    <!--
+      Shown on the first visit only. CSS hides it outright once
+      <html data-visited> is set, so it never flashes during navigation.
+    -->
+    <div class="loader" id="loader" role="status" aria-live="polite">
+      <div class="loader__inner">
+        <span class="loader__label">Cheng Wei, Wang</span>
+        <div class="loader__bar"><span class="loader__fill" id="loader-fill"></span></div>
+        <span class="loader__pct" id="loader-pct">0</span>
+      </div>
+    </div>
+
+    <!--
+      transition:persist keeps this exact DOM node across navigations, so the
+      WebGL context is never torn down and the particle field keeps running.
+    -->
+    <canvas class="webgl" id="webgl" aria-hidden="true" transition:persist="webgl"></canvas>
+    <div class="fallback-bg" aria-hidden="true" transition:persist="fallback"></div>
+    <div class="grain" aria-hidden="true" transition:persist="grain"></div>
+
+    <Header />
+
+    <slot />
+
+    <Footer />
+
+    <script>
+      import "../scripts/site.js";
+    </script>
+  </body>
+</html>
