@@ -12,20 +12,20 @@ const { title, category, overview, year, cover } = entry.data;
 const num = String(index + 1).padStart(2, "0");
 ---
 
-<a class="work-card" href={`/works/${entry.id}/`} data-category={category}>
-  <span class="work-card__glow" aria-hidden="true"></span>
+<a class="card" href={`/works/${entry.id}/`} data-category={category} data-tilt>
+  <span class="card__glow" aria-hidden="true" data-tilt-glow></span>
 
-  <span class="work-card__index mono">
+  <span class="card__index mono">
     <span>({num}) — {categoryLabel(category)}</span>
-    {year && <span class="work-card__year">{year}</span>}
+    {year && <span class="card__meta">{year}</span>}
   </span>
 
-  {cover && <img class="work-card__thumb" src={cover} alt="" loading="lazy" decoding="async" />}
+  {cover && <img class="card__thumb" src={cover} alt="" loading="lazy" decoding="async" />}
 
-  <div class="work-card__body">
-    <h3 class="work-card__title">{title}</h3>
-    <p class="work-card__desc">{overview}</p>
-    <span class="work-card__cta mono">
+  <div class="card__body">
+    <h3 class="card__title">{title}</h3>
+    <p class="card__desc">{overview}</p>
+    <span class="card__cta mono">
       View project
       <span class="arrow" aria-hidden="true">↗</span>
     </span>

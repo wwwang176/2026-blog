@@ -1,0 +1,17 @@
+---
+interface Props {
+  /**
+   * How many cards are inside. Passed through to CSS so a grid holding one or
+   * two entries doesn't stretch them into banners across a wide screen —
+   * `auto-fit` alone would happily do exactly that.
+   */
+  count: number;
+  class?: string;
+}
+
+const { count, class: className } = Astro.props;
+---
+
+<div class:list={["card-grid", className]} style={`--card-count:${count}`} data-cards>
+  <slot />
+</div>

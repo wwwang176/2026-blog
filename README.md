@@ -207,7 +207,9 @@ src/
   layouts/
     BaseLayout.astro    <head>, canvas, header/footer, ClientRouter
   components/
-    Header.astro, Footer.astro, WorkCard.astro
+    Header.astro, Footer.astro
+    CardGrid.astro  grid wrapper; caps width by card count
+    WorkCard.astro, PostCard.astro
     blocks/         content blocks usable from .mdx
   content/
     works/          ← project content
@@ -235,6 +237,3 @@ no backend, nothing to maintain. Add, remove or reorder entries there:
 
 `value` is what the visitor reads; `href` is where it goes. Anything starting
 with `http` opens in a new tab automatically, `mailto:` links don't.
-
-The GitHub and CodePen entries currently point at `your-username` placeholders
-and need replacing.

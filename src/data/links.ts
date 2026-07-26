@@ -1,9 +1,9 @@
 /**
  * Contact channels, rendered as the list in the Contact section.
  *
- * TODO — the GitHub and CodePen URLs below are placeholders. Replace
- * `your-username` with the real handles (or delete an entry entirely if you
- * don't want it listed). The email is already correct.
+ * Add, remove or reorder freely — the layout adapts. `value` is what the
+ * visitor reads, `href` is where it goes; anything starting with http opens
+ * in a new tab.
  */
 export interface ContactLink {
   /** Short label in the left column. */
@@ -21,12 +21,13 @@ export const CONTACT_LINKS: ContactLink[] = [
   },
   {
     label: "GitHub",
-    value: "github.com/your-username",
-    href: "https://github.com/your-username",
+    value: "github.com/wwwang176",
+    href: "https://github.com/wwwang176",
   },
   {
+    // Links straight to the public pens rather than the profile landing page.
     label: "CodePen",
-    value: "codepen.io/your-username",
-    href: "https://codepen.io/your-username",
+    value: "codepen.io/wwwang176",
+    href: "https://codepen.io/wwwang176/pens/public",
   },
 ];

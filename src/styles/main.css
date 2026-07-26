@@ -434,15 +434,25 @@ main {
   text-transform: uppercase;
 }
 
-.works__grid {
+/* ── Cards ──────────────────────────────────────────────────
+   Shared by works and journal. The 3D tilt is driven by JS
+   (`[data-tilt]` in site.js); everything here is the resting state
+   plus the hover transitions it layers on top of.
+   ──────────────────────────────────────────────────────────── */
+
+.card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(19rem, 100%), 1fr));
   gap: 1px;
   background: var(--line-soft);
   border: 1px solid var(--line-soft);
+  /* Caps the grid at roughly one card's ideal width per card, so a lone entry
+     stays card-shaped instead of stretching the full viewport. Above four or
+     five cards this exceeds the container and stops mattering. */
+  max-width: calc(var(--card-count, 99) * 26rem);
 }
 
-.work-card {
+.card {
   position: relative;
   background: rgba(15, 15, 19, 0.55);
   backdrop-filter: blur(6px);
@@ -458,15 +468,28 @@ main {
   will-change: transform;
 }
 
-.work-card:hover {
+.card:hover {
   background: rgba(21, 21, 27, 0.75);
 }
 
-.work-card__index {
+.card[hidden] {
+  display: none;
+}
+
+.card__index {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
   color: var(--muted);
 }
 
-.work-card__thumb {
+/* Right-hand slot on the index row: a year, or a date. */
+.card__meta {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.card__thumb {
   width: 100%;
   aspect-ratio: 16 / 10;
   object-fit: cover;
@@ -475,16 +498,17 @@ main {
   transform: translateZ(14px);
 }
 
-.work-card:hover .work-card__thumb {
+.card:hover .card__thumb {
   filter: grayscale(0) contrast(1);
   transform: translateZ(14px) scale(1.03);
 }
 
-.work-card__body {
+/* Lifted toward the viewer so the tilt reads as depth, not skew. */
+.card__body {
   transform: translateZ(28px);
 }
 
-.work-card__title {
+.card__title {
   margin: 0 0 0.5rem;
   font-size: clamp(1.35rem, 2.4vw, 1.85rem);
   font-weight: 500;
@@ -492,32 +516,37 @@ main {
   line-height: 1.15;
 }
 
-.work-card__desc {
+.card__desc {
   margin: 0 0 1.25rem;
   font-size: 0.9rem;
   line-height: 1.55;
   color: var(--fg-dim);
   max-width: 26ch;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.work-card__cta {
+.card__cta {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   color: var(--fg);
 }
 
-.work-card__cta .arrow {
+.card__cta .arrow {
   display: inline-block;
   transition: transform 0.5s var(--ease-out);
 }
 
-.work-card:hover .work-card__cta .arrow {
+.card:hover .card__cta .arrow {
   transform: translateX(4px) translateY(-4px);
 }
 
 /* Accent wash that follows the cursor. */
-.work-card__glow {
+.card__glow {
   position: absolute;
   width: 26rem;
   height: 26rem;
@@ -531,19 +560,29 @@ main {
   transform: translate(-50%, -50%);
 }
 
-.work-card:hover .work-card__glow {
+.card:hover .card__glow {
   opacity: 1;
 }
 
-.work-card[data-placeholder="true"] .work-card__title::after {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-left: 0.5rem;
-  border-radius: 50%;
-  background: var(--accent);
-  vertical-align: middle;
+/* Journal cards carry tags instead of a CTA arrow row. */
+.card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.card__tags li {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 /* ── Contact ────────────────────────────────────────────── */
@@ -678,7 +717,7 @@ main {
 }
 
 .section__more .arrow,
-.work-card__cta .arrow,
+.card__cta .arrow,
 .post-row .arrow {
   display: inline-block;
   transition: transform 0.5s var(--ease-out);
@@ -725,10 +764,6 @@ main {
 .filter__count {
   font-size: 0.62rem;
   opacity: 0.55;
-}
-
-.work-card[hidden] {
-  display: none;
 }
 
 /* ── Journal list ───────────────────────────────────────── */
@@ -791,27 +826,6 @@ main {
   .post-row__desc {
     grid-column: 1 / -1;
   }
-}
-
-/* ── Work card refinements ──────────────────────────────── */
-
-.work-card__index {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.work-card__year {
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-.work-card__desc {
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 /* ── Work detail ────────────────────────────────────────── */

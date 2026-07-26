@@ -1,0 +1,49 @@
+---
+import type { CollectionEntry } from "astro:content";
+
+interface Props {
+  entry: CollectionEntry<"journal">;
+  index: number;
+}
+
+const { entry, index } = Astro.props;
+const { title, description, date, tags } = entry.data;
+const num = String(index + 1).padStart(2, "0");
+
+const dateFmt = new Intl.DateTimeFormat("en-GB", {
+  year: "numeric",
+  month: "short",
+  day: "2-digit",
+});
+---
+
+<a class="card" href={`/journal/${entry.id}/`} data-tilt>
+  <span class="card__glow" aria-hidden="true" data-tilt-glow></span>
+
+  <span class="card__index mono">
+    <span>({num}) — Journal</span>
+    <time class="card__meta" datetime={date.toISOString()}>{dateFmt.format(date)}</time>
+  </span>
+
+  <div class="card__body">
+    <h3 class="card__title">{title}</h3>
+    <p class="card__desc">{description}</p>
+
+    {
+      tags.length > 0 ? (
+        <ul class="card__tags">
+          {tags.map((tag) => (
+            <li>{tag}</li>
+          ))}
+        </ul>
+      ) : (
+        <span class="card__cta mono">
+          Read
+          <span class="arrow" aria-hidden="true">
+            ↗
+          </span>
+        </span>
+      )
+    }
+  </div>
+</a>

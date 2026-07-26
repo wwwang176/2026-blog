@@ -335,12 +335,16 @@ function playIntro() {
 
 /* ── Interactions ─────────────────────────────────────────── */
 
-/** Cursor-tracked 3D tilt on work cards. Skipped on touch and reduced motion. */
+/**
+ * Cursor-tracked 3D tilt. Attribute-driven rather than class-driven, so any
+ * card picks it up by adding `data-tilt` (works and journal both do).
+ * Skipped on touch and under reduced motion.
+ */
 function bindTilt() {
   if (prefersReduced) return;
 
-  document.querySelectorAll(".work-card").forEach((card) => {
-    const glow = card.querySelector(".work-card__glow");
+  document.querySelectorAll("[data-tilt]").forEach((card) => {
+    const glow = card.querySelector("[data-tilt-glow]");
     if (!glow) return;
 
     const setRotX = gsap.quickTo(card, "rotationX", { duration: 0.6, ease: "power3.out" });
@@ -372,7 +376,10 @@ function bindFilters() {
   if (!bar) return;
 
   const buttons = [...bar.querySelectorAll(".filter")];
-  const cards = [...document.querySelectorAll(".work-card")];
+  // Only work cards carry a category; journal cards are never filtered.
+  const cards = [...document.querySelectorAll(".card[data-category]")];
+
+  const grid = cards[0]?.parentElement;
 
   bar.addEventListener("click", (e) => {
     const btn = e.target.closest(".filter");
@@ -381,10 +388,16 @@ function bindFilters() {
     const key = btn.dataset.filter;
     buttons.forEach((b) => b.classList.toggle("is-active", b === btn));
 
+    let shown = 0;
     cards.forEach((card) => {
       const show = key === "all" || card.dataset.category === key;
       card.hidden = !show;
+      if (show) shown++;
     });
+
+    // Keep the grid's width cap in step with what's actually visible, or
+    // filtering down to one result stretches it across the viewport.
+    grid?.style.setProperty("--card-count", String(shown));
 
     ScrollTrigger.refresh();
   });

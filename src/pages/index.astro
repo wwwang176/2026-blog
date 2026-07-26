@@ -3,6 +3,7 @@ import { getCollection } from "astro:content";
 
 import BaseLayout from "../layouts/BaseLayout.astro";
 import WorkCard from "../components/WorkCard.astro";
+import CardGrid from "../components/CardGrid.astro";
 import { CONTACT_LINKS } from "../data/links";
 
 const works = (await getCollection("works"))
@@ -82,9 +83,9 @@ const dateFmt = new Intl.DateTimeFormat("en-GB", {
         </div>
       </div>
 
-      <div class="works__grid" data-cards>
+      <CardGrid count={works.length}>
         {works.map((entry, i) => <WorkCard entry={entry} index={i} />)}
-      </div>
+      </CardGrid>
 
       <a class="section__more mono" href="/works/">
         All works <span class="arrow" aria-hidden="true">↗</span>
