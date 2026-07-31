@@ -12,6 +12,7 @@ link:
   url: "http://www.wresic.tw"
   label: "wresic.tw"
   status: deprecated
+cover: /works/wresic/cover.jpg
 featured: true
 order: 1
 ---
@@ -38,34 +39,32 @@ order: 1
   }}
 />
 
-<Features
-  items={[
-    {
-      title: "Easy to Use",
-      /* TODO: replace with real copy */
-      body: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum a tortor consequat, condimentum est non, efficitur lorem. Phasellus felis tellus, scelerisque at venenatis non, accumsan sit amet augue. Aliquam laoreet.",
-    },
-    {
-      title: "Non-stop Service",
-      /* TODO: replace with real copy */
-      body: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum a tortor consequat, condimentum est non, efficitur lorem. Phasellus felis tellus, scelerisque at venenatis non, accumsan sit amet augue. Aliquam laoreet.",
-    },
-  ]}
-/>
-
 <Stats
   title="Visits of People"
   period="2009 Feb — 2011 Jan"
   items={[
-    { value: "39,409", label: "Avg. Use of Day" },
-    { value: "21,725,208", label: "Total of People Used" },
-    { value: "24,650,322", label: "Total of Made Music" },
+    { value: "45,899", label: "Avg. Use of Day" },
+    { value: "33,047,927", label: "Total of People Used" },
+    { value: "46,928,057", label: "Total of Made Music" },
   ]}
 />
 
-{/* TODO: replace with real copy */}
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum a tortor
-consequat, condimentum est non, efficitur lorem. Phasellus felis tellus,
-scelerisque at venenatis non, accumsan sit amet augue. Aliquam laoreet.
+{/*
+  Two things are missing from this page, and both were missing on the old site
+  too — the archived copy at wwwang.tw shipped Lorem ipsum in these slots, so
+  there is no original text to recover. Rather than republish placeholder
+  prose, the blocks are parked here until you write them.
+
+  1. A two-up feature pair:
+
+  <Features
+    items={[
+      { title: "Easy to Use",       body: "…" },
+      { title: "Non-stop Service",  body: "…" },
+    ]}
+  />
+
+  2. A closing paragraph, then the link back to the journal.
+*/}
 
 <Callout href="/journal/">More information? Check out my blog.</Callout>
