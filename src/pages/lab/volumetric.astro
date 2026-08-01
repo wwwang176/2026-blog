@@ -207,6 +207,11 @@ import "../../styles/main.css";
         );
       }, { passive: true });
 
+      // Runtime handle for tuning. Toggling a pass on the live instance is the
+      // only way to compare costs without a reload, and a reload means a fresh
+      // warm-up — which is where every misleading measurement so far came from.
+      window.__lab = { field };
+
       const params = new URLSearchParams(location.hash.slice(1));
 
       // `#fuel=1` draws the solid the flame is shaped from, for comparison.

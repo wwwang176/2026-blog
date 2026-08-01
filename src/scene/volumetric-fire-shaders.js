@@ -42,7 +42,7 @@ const NOISE = /* glsl */ `
   float fbm(vec3 p) {
     float v = 0.0;
     float a = 0.5;
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 3; i++) {
       v += a * vnoise(p);
       p *= 2.06;
       a *= 0.5;
@@ -286,6 +286,7 @@ export const volumeFragment = /* glsl */ `
   uniform float uDisperse;
   uniform float uOpacity;
   uniform float uFuel;
+  uniform float uStride;
   uniform int uSteps;
 
   varying vec2 vUv;
@@ -461,7 +462,13 @@ export const volumeFragment = /* glsl */ `
     // Step length inside the volume, in local units. Sized against the field's
     // detail rather than against the box, so the sampling rate does not change
     // with viewing angle.
-    float ds = 0.075;
+    //
+    // This, not uSteps, is what the frame time actually rides on. The step cap
+    // is almost never reached — rays terminate on transmittance or leave the
+    // box first — so raising the cap costs nothing and lowering it changes
+    // nothing. The stride is what decides how many expensive samples land
+    // inside the flame.
+    float ds = uStride;
     float dt = ds * uScale;
 
     // The furthest a sample can be displaced and still land inside the letter,
@@ -472,8 +479,15 @@ export const volumeFragment = /* glsl */ `
     vec3 col = vec3(0.0);
     float trans = 1.0;
 
-    // Dither the entry point. Without it the fixed step lands on the same
-    // surfaces every frame and the volume bands into visible shells.
+    // Dither the entry point, or the fixed stride lands on the same surfaces
+    // across the whole screen and the volume bands into visible shells.
+    //
+    // Reseeded every frame on purpose. Interleaved gradient noise was tried
+    // here for its better spatial distribution, held static so it would not
+    // shimmer — and it was worse: at this stride the dither carries enough
+    // reconstruction error that a fixed pattern resolves into visible
+    // cross-hatching. A hash that is resampled every frame never settles into
+    // a shape, and the eye averages it away over a few frames instead.
     float t = t0 + hash13(vec3(gl_FragCoord.xy, uTime)) * dt;
 
     for (int i = 0; i < 128; i++) {

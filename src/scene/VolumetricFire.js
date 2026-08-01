@@ -128,6 +128,9 @@ export default class VolumetricFire {
         // Off by default: the letterform is where the flame comes from, not
         // something to look at. Set to 1 to see the solid it is shaped by.
         uFuel: { value: 0 },
+        // Local-unit stride inside the volume. The real cost control — see the
+        // note at its use in the shader.
+        uStride: { value: 0.17 },
         uSteps: { value: this.steps },
       },
     });
@@ -205,10 +208,15 @@ export default class VolumetricFire {
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
 
+    // Bloom runs at half the resolution of everything else. It is a blur, so
+    // the detail it is denied is detail it was about to destroy — the same
+    // argument as the raymarch buffer, only more so.
+    this.bloomScale = 0.5;
+
     // Only the hottest cores catch it. Bloom should be the thing you notice
     // last, not the thing doing the work.
     this.bloom = new UnrealBloomPass(
-      new Vector2(window.innerWidth, window.innerHeight),
+      new Vector2(window.innerWidth * this.bloomScale, window.innerHeight * this.bloomScale),
       quality === "low" ? 0.22 : 0.3,
       0.45,
       0.8
@@ -259,7 +267,8 @@ export default class VolumetricFire {
 
     this.composer.setPixelRatio(dpr);
     this.composer.setSize(w, h);
-    this.bloom.setSize(w, h);
+    // After the composer, which would otherwise reset it to full size.
+    this.bloom.setSize(w * this.bloomScale, h * this.bloomScale);
   }
 
   tick(dt) {
