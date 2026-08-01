@@ -38,6 +38,8 @@ const SAND_SHAPE = /* glsl */ `
   uniform float uErosion;
   uniform float uWind;
   uniform float uTime;
+  uniform float uGrainPhase;
+  uniform float uDustPhase;
 
   float sdBody(vec3 p) {
     vec2 w = vec2(sdOutline(p.xy), abs(p.z) - uDepth);
@@ -86,7 +88,15 @@ const SAND_SHAPE = /* glsl */ `
     // third octave is finer than a pixel at any resolution this renders at, so
     // it was detail nobody could see costing a full noise evaluation on every
     // sample near the surface.
-    vec3 q = p * uGrainFreq + vec3(-uTime * uWind, 0.0, uTime * uWind * 0.2);
+    //
+    // The offset is an accumulated phase, not time times the current speed.
+    // Those are the same thing only while the speed is constant: multiply and
+    // the offset is t*v, so the instant v changes the offset jumps by t*dv —
+    // which at half a minute in and a wind going from 0.6 to 3.2 is a texture
+    // displacement of seventy units. Scroll made the whole surface teleport.
+    // Integrating instead means a change in wind can only ever change the rate
+    // it is scrolling at.
+    vec3 q = p * uGrainFreq + vec3(-uGrainPhase, 0.0, uGrainPhase * 0.2);
     return vnoise(q) * 0.62 + vnoise(q * 2.1 + 7.3) * 0.38;
   }
 
@@ -255,7 +265,7 @@ export const granularFragment = /* glsl */ `
   /* ── The air ───────────────────────────────────────────────────── */
 
   float dustDensity(vec3 p) {
-    vec3 q = p * vec3(0.42, 1.05, 0.7) + vec3(-uTime * uWind * 1.6, 0.0, uTime * 0.1);
+    vec3 q = p * vec3(0.42, 1.05, 0.7) + vec3(-uDustPhase, 0.0, uTime * 0.1);
     float n = vnoise(q) * 0.62 + vnoise(q * 2.35 + 4.1) * 0.38;
 
     // The threshold is what makes shafts possible. Dust that is present
@@ -463,6 +473,7 @@ export const grainVertex = /* glsl */ `
   uniform float uErosion;
   uniform float uWind;
   uniform float uGust;
+  uniform float uFlowPhase;
   uniform float uDeflect;
   uniform float uSize;
   uniform float uPixelRatio;
@@ -472,18 +483,24 @@ export const grainVertex = /* glsl */ `
   varying float vNear;
 
   void main() {
-    float speed = (0.35 + uWind) * uGust;
-
+    // Accumulated on the CPU, for the same reason the surface grain is: with
+    // the wind inside the multiply, every one of these jumped to a new point
+    // in its flight the instant the wind changed.
     float rate = 0.20 + hash11(aSeed) * 0.34;
-    float life = fract(aSeed * 0.613 + uTime * rate * (0.5 + uWind));
+    float life = fract(aSeed * 0.613 + uFlowPhase * rate);
 
     vec3 p = aAnchor;
 
     // Downwind, at a speed of its own. The spread of speeds matters more than
     // the average: a field of grains all travelling together reads as one sheet
     // sliding across, and it is the ones overtaking each other that read as air.
+    // No speed factor here either. Distance is a function of how far through
+    // its flight the grain is, and the wind and the gusting decide how fast it
+    // gets there — with the speed multiplying the distance instead, a gust
+    // breathing in and out slid every grain backwards and forwards rather than
+    // making it travel faster.
     float carry = 3.0 + hash11(aSeed + 4.4) * 9.5;
-    p.x -= life * carry * speed;
+    p.x -= life * carry;
 
     // Lifted, then dropped. Ballistic rather than buoyant, which is the whole
     // difference from an ember.

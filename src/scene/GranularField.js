@@ -58,6 +58,13 @@ export default class GranularField {
     this.time = 0;
     this.spin = 0;
     this.progress = 0;
+
+    // Integrated, not derived from time and the current speed. Anything that
+    // scrolls at a rate the scroll can change has to accumulate its own phase
+    // — see the note in grainAt for what the multiply does when the rate moves.
+    this.grainPhase = 0;
+    this.dustPhase = 0;
+    this.flowPhase = 0;
     this.baseOpacity = 1;
     this.disposed = false;
 
@@ -146,6 +153,8 @@ export default class GranularField {
         uLevel: { value: 0.6 },
         // Gusting, written once per frame and shared with the grains.
         uGust: { value: 1 },
+        uGrainPhase: { value: 0 },
+        uDustPhase: { value: 0 },
         // Warm neutral, and deliberately the least saturated of the three —
         // fire took the accent and water took the cool one, so this is the
         // element with no colour of its own.
@@ -232,6 +241,7 @@ export default class GranularField {
         uWind: u.uWind,
         uGust: u.uGust,
         uSand: u.uSand,
+        uFlowPhase: { value: 0 },
         uDeflect: { value: 0.55 },
         // Additive, so this is the level *after* overlap. At one the field piled
         // up into a whiteout that buried the mark entirely — a hundred and ten
@@ -323,6 +333,21 @@ export default class GranularField {
     this.material.uniforms.uGust.value =
       0.55 + 0.45 * (0.5 + 0.5 * Math.sin(this.time * 0.37))
                   * (0.55 + 0.45 * Math.sin(this.time * 0.83 + 1.7));
+
+    const u = this.material.uniforms;
+    const wind = u.uWind.value;
+    const gust = u.uGust.value;
+
+    // The three things the wind carries. Each advances by rate times dt, so
+    // changing the rate changes how fast they move from here and never where
+    // they are — which is the whole point of keeping a phase at all.
+    this.grainPhase += dt * wind;
+    this.dustPhase += dt * wind * 1.6;
+    this.flowPhase += dt * (0.5 + wind) * gust;
+
+    u.uGrainPhase.value = this.grainPhase;
+    u.uDustPhase.value = this.dustPhase;
+    this.grainMaterial.uniforms.uFlowPhase.value = this.flowPhase;
 
     this.pointer.lerp(this.pointerTarget, 0.045);
 
