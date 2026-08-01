@@ -104,6 +104,7 @@ export const granularFragment = /* glsl */ `
   uniform float uOpacity;
   uniform float uFeather;
   uniform float uAO;
+  uniform float uLevel;
   uniform vec3 uSand;
   uniform int uSteps;
 
@@ -213,11 +214,14 @@ export const granularFragment = /* glsl */ `
     // separating the underside of a stroke from its top.
     float sky = 0.5 + 0.5 * n.y;
 
-    // Held under one on purpose. Sand is a dark material — its albedo is
-    // around 0.3 — and pushing it up past the tone curve's shoulder is what
-    // turned the first attempt into polystyrene: everything above one
-    // compresses toward white and takes the colour with it.
-    vec3 col = uSand * 0.95 * sun;
+    // Held well under one on purpose, and lower again than it started. Sand is
+    // a dark material — its albedo is around 0.3 — and pushing it past the
+    // tone curve's shoulder is what turned the first attempt into polystyrene.
+    //
+    // Keeping the body down also has nothing to do with realism: it is what
+    // lets the airborne grains read. A bright mass with dust in front of it is
+    // a bright mass; the same dust against a dark one is weather.
+    vec3 col = uSand * uLevel * sun;
     col += uSand * vec3(0.62, 0.68, 1.0) * fill * 0.16 * ao;
     col += uSand * vec3(0.55, 0.60, 0.85) * sky * 0.10 * ao;
     col *= mix(0.55, 1.0, ao);
@@ -233,7 +237,7 @@ export const granularFragment = /* glsl */ `
 `;
 
 /**
- * Grains taken off the surface by the wind.
+ * The air, full of sand.
  *
  * These project themselves, for the same reason the fire's embers do: the
  * camera lives in the fragment shader and the scene camera is a placeholder.
@@ -241,6 +245,14 @@ export const granularFragment = /* glsl */ `
  * they accelerate away from what made them. Grains are cold, they travel
  * sideways, and they fall back — sand blown off a dune does not leave, it
  * lands a little further along.
+ *
+ * The first version put nine hundred of them on the letterform and faded them
+ * almost out unless the scroll was driving the erosion, which meant that at
+ * rest the scene was a sand sculpture with nothing happening to it. It was
+ * accurate and it was dull. Weathering is not something you infer from a
+ * texture; it is the air being visibly full of what used to be the object. So
+ * there are a great many more now, most of them are not on the letterform at
+ * all but drifting through the whole frame, and they never stop.
  */
 export const grainVertex = /* glsl */ `
   float hash11(float p) {
@@ -261,32 +273,40 @@ export const grainVertex = /* glsl */ `
   uniform vec2 uRot;
   uniform float uErosion;
   uniform float uWind;
+  uniform float uGust;
   uniform float uSize;
+  uniform float uStreak;
   uniform float uPixelRatio;
 
   varying float vLife;
   varying float vSeed;
+  varying float vNear;
 
   void main() {
-    float rate = 0.28 + hash11(aSeed) * 0.5;
-    float life = fract(aSeed * 0.613 + uTime * rate * (0.6 + uWind));
+    float speed = (0.35 + uWind) * uGust;
+
+    float rate = 0.20 + hash11(aSeed) * 0.34;
+    float life = fract(aSeed * 0.613 + uTime * rate * (0.5 + uWind));
 
     vec3 p = aAnchor;
 
-    // Downwind, at a speed of its own, and quickly — a grain is small enough
-    // that the air moves it almost at the air's own speed.
-    float carry = 2.2 + hash11(aSeed + 4.4) * 5.4;
-    p.x -= life * carry * (0.35 + uWind);
+    // Downwind, at a speed of its own. The spread of speeds matters more than
+    // the average: a field of grains all travelling together reads as one
+    // sheet sliding across, and it is the ones overtaking each other that read
+    // as air.
+    float carry = 3.0 + hash11(aSeed + 4.4) * 9.5;
+    p.x -= life * carry * speed;
 
-    // Lifted off the surface, then dropped. Ballistic rather than buoyant,
-    // which is the whole difference from an ember.
-    float lift = 0.5 + hash11(aSeed + 17.1) * 1.5;
+    // Lifted, then dropped. Ballistic rather than buoyant, which is the whole
+    // difference from an ember.
+    float lift = 0.35 + hash11(aSeed + 17.1) * 1.7;
     p.y += life * lift - life * life * lift * 1.7;
 
-    p.z += (hash11(aSeed + 31.7) - 0.5) * 2.4 * life;
+    p.z += (hash11(aSeed + 31.7) - 0.5) * 3.2 * life;
 
-    // Saltation: a grain skips rather than flying, so it flutters on the way.
-    p.y += sin(uTime * 7.0 + aSeed * 9.0) * life * 0.10;
+    // Saltation: a grain skips rather than flies, so it flutters on the way.
+    p.y += sin(uTime * 6.0 + aSeed * 9.0) * life * 0.14;
+    p.z += cos(uTime * 4.6 + aSeed * 5.0) * life * 0.10;
 
     float cy = uRot.y;
     mat2 inv = mat2(cos(cy), sin(cy), -sin(cy), cos(cy));
@@ -297,6 +317,7 @@ export const grainVertex = /* glsl */ `
 
     vLife = life;
     vSeed = aSeed;
+    vNear = smoothstep(1.0, 5.0, zc);
 
     if (zc < 0.6) {
       gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
@@ -309,7 +330,12 @@ export const grainVertex = /* glsl */ `
       world.y / (zc * uTanHalfFov),
       0.0, 1.0
     );
-    gl_PointSize = min(uSize * aScale * uPixelRatio / zc, 10.0 * uPixelRatio);
+    // The sprite is the length of the streak, not the thickness of the grain
+    // — the fragment squashes it across the wind, so a ten-pixel sprite draws
+    // a ten by two streak. Sized against the camera depth, which is where the
+    // fire's embers went wrong too: uSize over a depth of twenty-one is a very
+    // different number from uSize.
+    gl_PointSize = min(uSize * aScale * uPixelRatio / zc, 48.0 * uPixelRatio);
   }
 `;
 
@@ -318,25 +344,40 @@ export const grainFragment = /* glsl */ `
 
   uniform float uOpacity;
   uniform float uErosion;
+  uniform float uDust;
+  uniform float uGust;
+  uniform float uStreak;
   uniform vec3 uSand;
 
   varying float vLife;
   varying float vSeed;
+  varying float vNear;
 
   void main() {
-    float d = length(gl_PointCoord - 0.5);
+    // Drawn as a streak rather than a dot, by squashing the sprite across the
+    // wind. A grain crossing the frame this fast covers several pixels in the
+    // time the frame is open, so a round point is what it looks like stopped,
+    // not what it looks like moving — and a field of round points reads as a
+    // starfield however many of them there are.
+    vec2 q = (gl_PointCoord - 0.5) * vec2(1.0, uStreak);
+    float d = length(q);
     if (d > 0.5) discard;
 
-    // Lit as dimly as the body it came off. Embers glow and are drawn with
-    // additive blending; a grain of sand is just a speck catching the sun, so
-    // these blend normally and stay under the body's own brightness.
-    float shade = 0.55 + 0.45 * fract(vSeed * 0.379);
+    // Additive, at a low level each. A grain in the air is a speck catching
+    // the sun against nothing, so it adds rather than covers — and with this
+    // many of them, adding is what lets a gust thicken into haze where they
+    // pile up along the line of sight instead of just becoming a denser
+    // scatter of individually opaque dots.
+    float shade = 0.4 + 0.6 * fract(vSeed * 0.379);
 
-    float alpha = smoothstep(0.5, 0.15, d)
-      * smoothstep(0.0, 0.08, vLife)
+    float alpha = smoothstep(0.5, 0.12, d)
+      * smoothstep(0.0, 0.07, vLife)
       * (1.0 - smoothstep(0.45, 1.0, vLife))
-      * (0.25 + uErosion * 2.2);
+      * vNear
+      * (0.55 + uErosion * 1.1)
+      * uDust
+      * uGust;
 
-    gl_FragColor = vec4(uSand * 1.9 * shade, min(alpha, 1.0) * uOpacity);
+    gl_FragColor = vec4(uSand * 1.5 * shade * alpha * uOpacity, alpha * uOpacity);
   }
 `;

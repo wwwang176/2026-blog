@@ -228,6 +228,15 @@ import "../../styles/main.css";
         ["wind", 0, 3, 0.05,
           () => field.material.uniforms.uWind.value,
           (v) => { field.material.uniforms.uWind.value = v; }],
+        ["body", 0.1, 1.4, 0.02,
+          () => field.material.uniforms.uLevel.value,
+          (v) => { field.material.uniforms.uLevel.value = v; }],
+        ["dust", 0, 3, 0.05,
+          () => field.grainMaterial.uniforms.uDust.value,
+          (v) => { field.grainMaterial.uniforms.uDust.value = v; }],
+        ["streak", 1, 10, 0.1,
+          () => field.grainMaterial.uniforms.uStreak.value,
+          (v) => { field.grainMaterial.uniforms.uStreak.value = v; }],
         // Megapixels, not a fraction of the window — the fraction is derived
         // from this and is what the readout below shows. Stated this way the
         // number means the same thing on every display.

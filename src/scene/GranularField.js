@@ -1,5 +1,6 @@
 import {
   ACESFilmicToneMapping,
+  AdditiveBlending,
   BufferAttribute,
   BufferGeometry,
   Color,
@@ -125,6 +126,11 @@ export default class GranularField {
         uErosion: { value: 0 },
         uWind: { value: 0.6 },
         uAO: { value: 2.2 },
+        // How bright the mass is allowed to get. Low, so the airborne grains
+        // have something dark to read against.
+        uLevel: { value: 0.42 },
+        // Gusting, written once per frame and shared with the grains.
+        uGust: { value: 1 },
         // Warm neutral, and deliberately the least saturated of the three —
         // fire took the accent and water took the cool one, so this is the
         // element with no colour of its own.
@@ -144,19 +150,40 @@ export default class GranularField {
 
   _initGrains() {
     const rand = makeRandom();
-    const count = 900;
 
-    // The mesh builder is used once to scatter anchors over the same
-    // letterform the distance field describes, then discarded.
+    // Point sprites this small are nearly free — the whole cloud is under a
+    // tenth of the raymarch — and the count is the effect. A few hundred read
+    // as specks coming off an object; this many read as air you cannot see
+    // through.
+    const count = 110000;
+
+    // A third of them start on the letterform, which is what gives the sense
+    // that the mark is the source. The rest start scattered through the frame
+    // and well upwind of it, so the air is already full before it arrives —
+    // sand only coming off the letters made the mark look like it was
+    // smoking, which is an emission, not a wind.
+    const fromBody = Math.floor(count * 0.30);
+
     const source = buildMonogramGeometry({ quality: "low" });
-    const anchors = sampleSurface(source, count, rand);
+    const surface = sampleSurface(source, fromBody, rand);
     source.dispose();
+
+    const anchors = new Float32Array(count * 3);
+    anchors.set(surface, 0);
+
+    for (let i = fromBody; i < count; i++) {
+      anchors[i * 3 + 0] = -3.6 + rand() * 9.6;
+      anchors[i * 3 + 1] = -1.8 + Math.pow(rand(), 0.8) * 3.6;
+      anchors[i * 3 + 2] = (rand() - 0.5) * 4.4;
+    }
 
     const scale = new Float32Array(count);
     const seed = new Float32Array(count);
 
     for (let i = 0; i < count; i++) {
-      scale[i] = 0.4 + Math.pow(rand(), 2.4) * 0.9;
+      // Weighted hard toward the small. A handful of larger grains near the
+      // camera give the field a depth that a uniform size cannot.
+      scale[i] = 0.3 + Math.pow(rand(), 3.2) * 1.5;
       seed[i] = rand() * 1000;
     }
 
@@ -175,6 +202,7 @@ export default class GranularField {
       transparent: true,
       depthWrite: false,
       depthTest: false,
+      blending: AdditiveBlending,
       uniforms: {
         // Shared by reference, so the two can never disagree about where the
         // camera is, how hard the wind blows, or what colour sand is.
@@ -187,8 +215,15 @@ export default class GranularField {
         uOpacity: u.uOpacity,
         uErosion: u.uErosion,
         uWind: u.uWind,
+        uGust: u.uGust,
         uSand: u.uSand,
-        uSize: { value: 34 },
+        // Additive, so this is the level *after* overlap. At one the field piled
+        // up into a whiteout that buried the mark entirely — a hundred and ten
+        // thousand streaks average several deep over any given pixel, and each
+        // one adds.
+        uDust: { value: 0.3 },
+        uStreak: { value: 4.2 },
+        uSize: { value: 500 },
         uPixelRatio: { value: 1 },
       },
     });
@@ -265,6 +300,13 @@ export default class GranularField {
 
     this.time += dt;
     this.material.uniforms.uTime.value = this.time;
+
+    // Two slow sines of unrelated period, so the wind thickens and thins
+    // without ever settling into a beat you can follow. A constant stream of
+    // grains reads as a screen effect; a gusting one reads as weather.
+    this.material.uniforms.uGust.value =
+      0.55 + 0.45 * (0.5 + 0.5 * Math.sin(this.time * 0.37))
+                  * (0.55 + 0.45 * Math.sin(this.time * 0.83 + 1.7));
 
     this.pointer.lerp(this.pointerTarget, 0.045);
 
