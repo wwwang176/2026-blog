@@ -1,0 +1,344 @@
+---
+/**
+ * Throwaway prototype — `CW.` as weightless liquid.
+ *
+ * Standalone like the other lab pages: no BaseLayout, no ClientRouter, no
+ * site.js, so nothing here can reach the live scene. Delete this file plus
+ * src/scene/GranularField.js, src/scene/granular-shaders.js to remove it.
+ */
+import "../../styles/main.css";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Lab — CW. granular</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+
+  <body>
+    <canvas class="lab-canvas" id="lab-canvas" aria-hidden="true"></canvas>
+
+    <!--
+      Every tunable that changes the look, on one panel. The fire was tuned by
+      editing a constant and reloading, and half those comparisons turned out
+      to be measuring the reload rather than the change.
+    -->
+    <div class="lab-tuner mono" id="tuner"></div>
+
+    <div class="lab-hud">
+      <label class="mono" for="scrub">progress</label>
+      <input id="scrub" type="range" min="0" max="3" step="0.01" value="0" />
+      <output class="mono" id="scrub-out">0.00</output>
+      <span class="mono" id="fps">—</span>
+      <button class="mono" id="scrub-toggle" type="button">scroll</button>
+    </div>
+
+    <main class="lab-main">
+      <section class="section section--hero">
+        <div class="hero__meta">
+          <span class="mono">Based in Taiwan</span>
+          <span class="mono">Lab · granular</span>
+        </div>
+
+        <p class="lab-name mono">Cheng Wei, Wang</p>
+
+        <div class="hero__foot">
+          <p class="hero__roles mono">
+            Front-End<span class="sep">/</span>Back-End<span class="sep">/</span>Web&nbsp;Game
+          </p>
+        </div>
+      </section>
+
+      <section class="section lab-section">
+        <p class="section__label mono">(01) — Heavy</p>
+        <p class="lab-copy">
+          The first of the three that is opaque, matte, and still. Fire is all
+          flow and water is all wobble; nothing here moves but the edges.
+        </p>
+      </section>
+
+      <section class="section lab-section">
+        <p class="section__label mono">(02) — Raking</p>
+        <p class="lab-copy">
+          One light, low and skimming. Overhead it would land evenly and
+          flatten every grain of the displacement into nothing.
+        </p>
+      </section>
+
+      <section class="section lab-section">
+        <p class="section__label mono">(03) — Weathering</p>
+        <p class="lab-copy">
+          The wind gets up. This is the only one of the three that does not
+          let go all at once.
+        </p>
+      </section>
+    </main>
+
+    <style>
+      .lab-canvas {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 0;
+        pointer-events: none;
+      }
+
+      .lab-main {
+        position: relative;
+        z-index: 1;
+      }
+
+      .lab-section {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+
+      .lab-copy {
+        max-width: 34ch;
+        margin-top: 1.5rem;
+        font-size: clamp(1rem, 2vw, 1.25rem);
+        color: var(--fg-dim);
+      }
+
+      .lab-name {
+        margin-top: auto;
+        color: var(--fg-dim);
+      }
+
+      .lab-hud {
+        position: fixed;
+        left: 50%;
+        bottom: 1.5rem;
+        transform: translateX(-50%);
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        padding: 0.7rem 1.1rem;
+        border: 1px solid var(--line-soft);
+        border-radius: 999px;
+        background: rgba(10, 10, 13, 0.82);
+        backdrop-filter: blur(12px);
+      }
+
+      .lab-hud input {
+        width: min(40vw, 22rem);
+        accent-color: var(--accent);
+      }
+
+      .lab-hud output {
+        min-width: 3.2em;
+        color: var(--accent);
+      }
+
+      .lab-hud #fps {
+        min-width: 8em;
+        color: var(--muted);
+      }
+
+      .lab-hud button {
+        padding: 0.35rem 0.7rem;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: none;
+        color: var(--fg-dim);
+        cursor: pointer;
+      }
+
+      .lab-hud button[data-mode="manual"] {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .lab-tuner {
+        position: fixed;
+        top: 1.5rem;
+        right: 1.5rem;
+        z-index: 10;
+        display: grid;
+        grid-template-columns: 5.5rem 1fr 3rem;
+        align-items: center;
+        gap: 0.35rem 0.6rem;
+        padding: 0.9rem 1rem;
+        border: 1px solid var(--line-soft);
+        border-radius: 0.6rem;
+        background: rgba(10, 10, 13, 0.82);
+        backdrop-filter: blur(12px);
+        font-size: 0.75rem;
+      }
+
+      .lab-tuner label {
+        color: var(--muted);
+      }
+
+      .lab-tuner input {
+        width: 9rem;
+        accent-color: var(--accent-cool);
+      }
+
+      .lab-tuner output {
+        color: var(--fg-dim);
+        text-align: right;
+      }
+    </style>
+
+    <script>
+      import GranularField from "../../scene/GranularField.js";
+
+      const canvas = document.getElementById("lab-canvas");
+      const scrub = document.getElementById("scrub");
+      const out = document.getElementById("scrub-out");
+      const toggle = document.getElementById("scrub-toggle");
+      const fpsEl = document.getElementById("fps");
+      const tuner = document.getElementById("tuner");
+
+      const field = new GranularField(canvas, { quality: "high" });
+      let manual = false;
+
+      /* ── Tuner ─────────────────────────────────────────────────── */
+
+      // Some of these are uniforms and some are properties the animation reads
+      // on the CPU, so each says where it goes rather than assuming.
+      const CONTROLS = [
+        ["grain freq", 6, 60, 0.5,
+          () => field.material.uniforms.uGrainFreq.value,
+          (v) => { field.material.uniforms.uGrainFreq.value = v; }],
+        ["grain amp", 0, 0.16, 0.002,
+          () => field.material.uniforms.uGrainAmp.value,
+          (v) => { field.material.uniforms.uGrainAmp.value = v; }],
+        ["depth", 0.15, 0.8, 0.01,
+          () => field.material.uniforms.uDepth.value,
+          (v) => { field.material.uniforms.uDepth.value = v; }],
+        ["occlusion", 0, 4, 0.05,
+          () => field.material.uniforms.uAO.value,
+          (v) => { field.material.uniforms.uAO.value = v; }],
+        ["wind", 0, 3, 0.05,
+          () => field.material.uniforms.uWind.value,
+          (v) => { field.material.uniforms.uWind.value = v; }],
+        // Megapixels, not a fraction of the window — the fraction is derived
+        // from this and is what the readout below shows. Stated this way the
+        // number means the same thing on every display.
+        ["budget", 0.2, 2.0, 0.05,
+          () => field.pixelBudget / 1e6,
+          (v) => { field.pixelBudget = v * 1e6; field.resize(); }],
+      ];
+
+      for (const [name, min, max, step, get, set] of CONTROLS) {
+        const label = document.createElement("label");
+        label.textContent = name;
+        label.htmlFor = `t-${name}`;
+
+        const input = document.createElement("input");
+        input.type = "range";
+        input.id = `t-${name}`;
+        input.min = String(min);
+        input.max = String(max);
+        input.step = String(step);
+        input.value = String(get());
+
+        const readout = document.createElement("output");
+        readout.textContent = Number(input.value).toFixed(3);
+
+        input.addEventListener("input", () => {
+          const v = Number(input.value);
+          set(v);
+          readout.textContent = v.toFixed(3);
+        });
+
+        tuner.append(label, input, readout);
+      }
+
+      /* ── Scrub ─────────────────────────────────────────────────── */
+
+      const show = (value) => {
+        field.setProgress(value);
+        out.textContent = value.toFixed(2);
+        if (!manual) scrub.value = String(value);
+      };
+
+      const fromScroll = () => {
+        const max = document.body.scrollHeight - window.innerHeight;
+        return max > 0 ? (window.scrollY / max) * 3 : 0;
+      };
+
+      scrub.addEventListener("input", () => {
+        manual = true;
+        toggle.dataset.mode = "manual";
+        toggle.textContent = "manual";
+        show(Number(scrub.value));
+      });
+
+      toggle.addEventListener("click", () => {
+        manual = !manual;
+        toggle.dataset.mode = manual ? "manual" : "";
+        toggle.textContent = manual ? "manual" : "scroll";
+        if (!manual) show(fromScroll());
+      });
+
+      window.addEventListener("scroll", () => {
+        if (!manual) show(fromScroll());
+      }, { passive: true });
+
+      window.addEventListener("resize", () => field.resize());
+
+      window.addEventListener("pointermove", (e) => {
+        field.setPointer(
+          (e.clientX / window.innerWidth) * 2 - 1,
+          (e.clientY / window.innerHeight) * 2 - 1
+        );
+      }, { passive: true });
+
+      window.__lab = { field };
+
+      const params = new URLSearchParams(location.hash.slice(1));
+
+      const pinned = Number(params.get("p"));
+      if (Number.isFinite(pinned) && location.hash.includes("p=")) {
+        manual = true;
+        toggle.dataset.mode = "manual";
+        toggle.textContent = "manual";
+        scrub.value = String(pinned);
+      }
+
+      let last = performance.now();
+      let frames = 0;
+      let acc = 0;
+
+      const loop = (now) => {
+        const dt = Math.min((now - last) / 1000, 0.05);
+        last = now;
+
+        field.tick(dt);
+
+        acc += dt;
+        frames++;
+        if (acc >= 0.5) {
+          // The scale is derived from the budget and the window, so it is the
+          // thing worth watching when either changes.
+          fpsEl.textContent =
+            `${Math.round(frames / acc)} fps · ${field.renderScale.toFixed(2)}×`;
+          frames = 0;
+          acc = 0;
+        }
+
+        requestAnimationFrame(loop);
+      };
+
+      show(manual ? Number(scrub.value) : 0);
+      requestAnimationFrame(loop);
+    </script>
+  </body>
+</html>
