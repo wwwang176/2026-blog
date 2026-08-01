@@ -2,6 +2,7 @@ import {
   AdditiveBlending,
   BufferAttribute,
   BufferGeometry,
+  CanvasTexture,
   Color,
   DoubleSide,
   Group,
@@ -11,6 +12,7 @@ import {
   Points,
   Scene,
   ShaderMaterial,
+  SRGBColorSpace,
   Vector2,
   WebGLRenderer,
   WireframeGeometry,
@@ -41,6 +43,66 @@ function makeRandom(seed = 20260801) {
 
 /** Normalised, clamped position of `v` inside [a, b]. */
 const range = (v, a, b) => Math.min(Math.max((v - a) / (b - a), 0), 1);
+
+/**
+ * Paints a matcap at runtime instead of shipping one.
+ *
+ * A matcap is just a lit sphere seen head-on, so it can be drawn with a stack
+ * of gradients: a cool body, sky from above, a tight specular up and to the
+ * left, a warm bounce coming back from below right, and the rim falling into
+ * shadow. Drawing it keeps the scene free of image assets, and it means the
+ * accent colour can be dialled in code rather than in an image editor.
+ */
+function makeMatcap(size = 512) {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+
+  const ctx = canvas.getContext("2d");
+  const s = size;
+
+  const paint = (gradient) => {
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, s, s);
+  };
+
+  // Body — cool, and not too dark through the middle. The centre is where
+  // every flat face lands, so a black core would sink the whole monogram.
+  const body = ctx.createLinearGradient(0, 0, 0, s);
+  body.addColorStop(0, "#5b6484");
+  body.addColorStop(0.55, "#2b3045");
+  body.addColorStop(1, "#0d0e17");
+  paint(body);
+
+  // Broad sky light.
+  const sky = ctx.createRadialGradient(s * 0.5, s * 0.1, 0, s * 0.5, s * 0.1, s * 0.78);
+  sky.addColorStop(0, "rgba(158,172,222,0.5)");
+  sky.addColorStop(1, "rgba(158,172,222,0)");
+  paint(sky);
+
+  // Key specular. Tight, and the only pure white in the image.
+  const key = ctx.createRadialGradient(s * 0.35, s * 0.27, 0, s * 0.35, s * 0.27, s * 0.34);
+  key.addColorStop(0, "rgba(255,255,255,0.96)");
+  key.addColorStop(0.3, "rgba(226,233,255,0.42)");
+  key.addColorStop(1, "rgba(226,233,255,0)");
+  paint(key);
+
+  // Warm bounce, so the shadow side is not simply darker but a different hue.
+  const bounce = ctx.createRadialGradient(s * 0.73, s * 0.78, 0, s * 0.73, s * 0.78, s * 0.44);
+  bounce.addColorStop(0, "rgba(255,106,52,0.46)");
+  bounce.addColorStop(1, "rgba(255,106,52,0)");
+  paint(bounce);
+
+  // Rim falloff — without this the material has no silhouette and reads flat.
+  const rim = ctx.createRadialGradient(s * 0.5, s * 0.5, s * 0.33, s * 0.5, s * 0.5, s * 0.5);
+  rim.addColorStop(0, "rgba(0,0,0,0)");
+  rim.addColorStop(1, "rgba(0,0,0,0.88)");
+  paint(rim);
+
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  return texture;
+}
 
 /**
  * Cross-fade windows. Each pair overlaps exactly, so one state is arriving at
@@ -125,14 +187,16 @@ export default class MonogramField {
     // ── Solid ────────────────────────────────────────────
     const geometry = buildMonogramGeometry({ quality });
 
+    this.matcap = makeMatcap();
+
     this.meshMaterial = new ShaderMaterial({
       vertexShader: meshVertex,
       fragmentShader: meshFragment,
       transparent: true,
       side: DoubleSide,
       uniforms: {
+        uMatcap: { value: this.matcap },
         uOpacity: { value: 1 },
-        uColorA: { value: this.colorA },
         uColorB: { value: this.colorB },
       },
     });
@@ -308,6 +372,7 @@ export default class MonogramField {
     this.geometry.dispose();
     this.wireGeometry.dispose();
     this.cloudGeometry.dispose();
+    this.matcap.dispose();
     this.meshMaterial.dispose();
     this.lineMaterial.dispose();
     this.pointMaterial.dispose();

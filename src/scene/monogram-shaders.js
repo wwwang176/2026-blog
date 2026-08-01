@@ -13,12 +13,16 @@
 export const meshVertex = /* glsl */ `
   varying vec3 vNormal;
   varying vec3 vView;
+  varying vec3 vPos;
 
   void main() {
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
 
     vNormal = normalize(normalMatrix * normal);
     vView = normalize(-mv.xyz);
+    // View-space position. The lighting needs this, not just the normal —
+    // see the note in the fragment shader.
+    vPos = mv.xyz;
 
     gl_Position = projectionMatrix * mv;
   }
@@ -27,34 +31,42 @@ export const meshVertex = /* glsl */ `
 export const meshFragment = /* glsl */ `
   precision highp float;
 
-  uniform vec3 uColorA;
+  uniform sampler2D uMatcap;
   uniform vec3 uColorB;
   uniform float uOpacity;
 
   varying vec3 vNormal;
   varying vec3 vView;
+  varying vec3 vPos;
 
   void main() {
     vec3 n = normalize(vNormal);
 
-    // Two hard-coded lights rather than real ones: the look is fully art
-    // directed and the scene stays free of lighting setup. The key is kept
-    // near-neutral — tinting key and rim both read as bruised purple.
-    // The key has to be close to frontal. Angled at 45° it landed on the front
-    // faces and the extruded side walls at almost the same intensity, which is
-    // what flattened the whole monogram into a silhouette. Frontal gives the
-    // faces roughly 4x the side walls, so the extrusion actually reads.
-    float key  = max(dot(n, normalize(vec3(0.28, 0.5, 0.92))), 0.0);
-    float fill = max(dot(n, normalize(vec3(-0.85, -0.15, 0.25))), 0.0);
-    // Tight exponent on purpose: at 2.4 the whole extruded side wall sat
-    // inside the falloff and the letters went muddy red. This keeps the warm
-    // accent as an edge, which is all it was ever meant to be.
-    float fres = pow(1.0 - max(dot(n, normalize(vView)), 0.0), 4.0);
+    // The matcap earns its keep on the bevels and the side walls, where the
+    // normal actually turns through the lookup.
+    vec2 uv = n.xy * 0.5 + 0.5;
+    vec3 col = texture2D(uMatcap, uv).rgb;
 
-    vec3 col = vec3(0.035)
-      + vec3(0.80, 0.81, 0.87) * key * 0.85
-      + uColorA * fill * 0.22
-      + uColorB * fres * 0.30;
+    // But a matcap cannot light flat extruded type on its own: every point on
+    // a letter's face shares the normal (0,0,1), so the entire face samples a
+    // single texel and comes out one dead colour. A light with a position
+    // varies across the face because the position varies, which is the whole
+    // difference between a surface and a silhouette.
+    vec3 toLight = vec3(-7.0, 8.5, 14.0) - vPos;
+    float dist = length(toLight);
+    vec3 l = toLight / dist;
+
+    float lambert = max(dot(n, l), 0.0);
+    float falloff = 1.0 / (1.0 + dist * dist * 0.0032);
+    col += vec3(1.0, 0.98, 0.95) * lambert * falloff * 1.25;
+
+    // Tight specular, so the rolled bevel reads as an edge catching light.
+    vec3 h = normalize(l + normalize(vView));
+    col += vec3(1.0) * pow(max(dot(n, h), 0.0), 48.0) * falloff * 0.7;
+
+    // A whisper of warm on the silhouette, tying it to the accent.
+    float fres = pow(1.0 - max(dot(n, normalize(vView)), 0.0), 5.0);
+    col += uColorB * fres * 0.22;
 
     gl_FragColor = vec4(col, uOpacity);
   }

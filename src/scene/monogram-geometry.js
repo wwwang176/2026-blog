@@ -182,7 +182,10 @@ export function buildMonogramGeometry({ quality = "high" } = {}) {
     bevelThickness: 0.05,
     bevelSize: 0.042,
     bevelOffset: 0,
-    bevelSegments: 1,
+    // Three segments, not one. A single-segment bevel is a hard chamfer with
+    // nowhere for a specular to travel; rolling the edge over a few faces is
+    // most of what separates a rendered object from a flat cut-out.
+    bevelSegments: 3,
   });
 
   geometry.center();
