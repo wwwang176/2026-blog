@@ -13,6 +13,11 @@ import {
   WebGLRenderer,
 } from "three";
 
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+
 import { buildMonogramGeometry, sampleSurface } from "./monogram-geometry.js";
 import {
   fireballFragment,
@@ -69,6 +74,7 @@ export default class FireballMonogram {
     this._initRenderer();
     this._initScene();
     this._build(quality);
+    this._initComposer(quality);
     this.resize();
   }
 
@@ -95,6 +101,37 @@ export default class FireballMonogram {
 
     this.root = new Group();
     this.scene.add(this.root);
+  }
+
+  /**
+   * Bloom is the largest remaining perceptual cue, and the cheapest.
+   *
+   * Fire without it reads as a sticker: real flame spills light into whatever
+   * is looking at it, and neither an eye nor a lens resolves a hot source as a
+   * hard edge. Everything before this was tuning what the pixels are; this is
+   * about how bright pixels behave against their neighbours.
+   *
+   * Order matters. Bloom has to see the raw linear values — the ramp puts them
+   * well past 1 — so tone mapping moves to OutputPass at the very end rather
+   * than happening inside the render.
+   */
+  _initComposer(quality) {
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+
+    // Only the hottest cores are allowed to bloom. The ramp already puts most
+    // of the frame above 1, so a low threshold made every pixel a light source
+    // — the letters lost their internal structure and the glow washed the
+    // whole background warm. Bloom should be the thing you notice last.
+    this.bloom = new UnrealBloomPass(
+      new Vector2(window.innerWidth, window.innerHeight),
+      quality === "low" ? 0.24 : 0.32,
+      0.45,
+      0.78
+    );
+    this.composer.addPass(this.bloom);
+
+    this.composer.addPass(new OutputPass());
   }
 
   _build(quality) {
@@ -227,10 +264,18 @@ export default class FireballMonogram {
     this.camera.position.z = aspect < 1 ? 23 + (1 - aspect) * 14 : 23;
     this.camera.updateProjectionMatrix();
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // Bloom is several full-screen passes, so it pays for the pixels twice
+    // over. Capping the ratio lower than the renderer would normally take is
+    // the cheapest lever there is, and the effect is a blur — nobody can see
+    // the missing resolution in it.
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.75);
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
     this.material.uniforms.uPixelRatio.value = dpr;
+
+    this.composer.setPixelRatio(dpr);
+    this.composer.setSize(w, h);
+    this.bloom.setSize(w, h);
     this.smokeMaterial.uniforms.uPixelRatio.value = dpr;
 
     this.modelScale = aspect < 1 ? 1.9 : 2.6;
@@ -256,7 +301,7 @@ export default class FireballMonogram {
     this.root.rotation.set(this.pointer.y * -0.1, this.spin + this.pointer.x * 0.16, 0);
     this.root.position.set(this.heroOffset.x * heroBias, this.heroOffset.y * heroBias, 0);
 
-    this.renderer.render(this.scene, this.camera);
+    this.composer.render();
   }
 
   dispose() {
@@ -264,6 +309,8 @@ export default class FireballMonogram {
     this.cloudGeometry.dispose();
     this.material.dispose();
     this.smokeMaterial.dispose();
+    this.bloom.dispose();
+    this.composer.dispose();
     this.renderer.dispose();
   }
 }
