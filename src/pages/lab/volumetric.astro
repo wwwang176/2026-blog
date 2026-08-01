@@ -207,7 +207,14 @@ import "../../styles/main.css";
         );
       }, { passive: true });
 
-      const pinned = Number(new URLSearchParams(location.hash.slice(1)).get("p"));
+      const params = new URLSearchParams(location.hash.slice(1));
+
+      // `#fuel=1` draws the solid the flame is shaped from, for comparison.
+      if (params.get("fuel") === "1") {
+        field.material.uniforms.uFuel.value = 1;
+      }
+
+      const pinned = Number(params.get("p"));
       if (Number.isFinite(pinned) && location.hash.includes("p=")) {
         manual = true;
         toggle.dataset.mode = "manual";

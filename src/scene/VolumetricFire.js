@@ -1,9 +1,11 @@
 import {
   ACESFilmicToneMapping,
+  AdditiveBlending,
   BufferAttribute,
   BufferGeometry,
   Mesh,
   OrthographicCamera,
+  Points,
   Scene,
   ShaderMaterial,
   Vector2,
@@ -15,7 +17,22 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 
-import { volumeFragment, volumeVertex } from "./volumetric-fire-shaders.js";
+import { buildMonogramGeometry, sampleSurface } from "./monogram-geometry.js";
+import {
+  emberFragment,
+  emberVertex,
+  volumeFragment,
+  volumeVertex,
+} from "./volumetric-fire-shaders.js";
+
+/** Deterministic PRNG so the embers are identical on every load. */
+function makeRandom(seed = 20260801) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
 
 /** Normalised, clamped position of `v` inside [a, b]. */
 const range = (v, a, b) => Math.min(Math.max((v - a) / (b - a), 0), 1);
@@ -53,7 +70,7 @@ export default class VolumetricFire {
 
     // Raymarching pays per pixel, and the result is soft — resolution is the
     // cheapest thing to spend here and the hardest to miss.
-    this.renderScale = quality === "low" ? 0.5 : quality === "medium" ? 0.62 : 0.72;
+    this.renderScale = quality === "low" ? 0.45 : quality === "medium" ? 0.55 : 0.65;
 
     this.heroOffset = new Vector2(0, 0);
 
@@ -108,15 +125,80 @@ export default class VolumetricFire {
         uRot: { value: new Vector2(0, 0) },
         uDisperse: { value: 0 },
         uOpacity: { value: 1 },
+        // Off by default: the letterform is where the flame comes from, not
+        // something to look at. Set to 1 to see the solid it is shaped by.
+        uFuel: { value: 0 },
         uSteps: { value: this.steps },
       },
     });
 
     this.quad = new Mesh(geometry, this.material);
     this.quad.frustumCulled = false;
+    this.quad.renderOrder = 0;
     this.scene.add(this.quad);
 
     this.quadGeometry = geometry;
+
+    this._initEmbers();
+  }
+
+  _initEmbers() {
+    const rand = makeRandom();
+    const count = 900;
+
+    // The mesh builder is used once, purely to scatter anchors over the same
+    // letterform the distance field describes, then discarded. It is the only
+    // place in this scene geometry appears at all.
+    const source = buildMonogramGeometry({ quality: "low" });
+    const anchors = sampleSurface(source, count, rand);
+    source.dispose();
+
+    const scale = new Float32Array(count);
+    const seed = new Float32Array(count);
+
+    for (let i = 0; i < count; i++) {
+      scale[i] = 0.35 + Math.pow(rand(), 2.2) * 1.1;
+      seed[i] = rand() * 1000;
+    }
+
+    const cloud = new BufferGeometry();
+    cloud.setAttribute("position", new BufferAttribute(anchors, 3));
+    cloud.setAttribute("aAnchor", new BufferAttribute(anchors, 3));
+    cloud.setAttribute("aScale", new BufferAttribute(scale, 1));
+    cloud.setAttribute("aSeed", new BufferAttribute(seed, 1));
+    cloud.boundingSphere = null;
+
+    const u = this.material.uniforms;
+
+    this.emberMaterial = new ShaderMaterial({
+      vertexShader: emberVertex,
+      fragmentShader: emberFragment,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+      blending: AdditiveBlending,
+      uniforms: {
+        // Shared by reference with the volume, so the two can never disagree
+        // about where the camera is or how big the monogram is.
+        uTime: u.uTime,
+        uCamZ: u.uCamZ,
+        uAspect: u.uAspect,
+        uTanHalfFov: u.uTanHalfFov,
+        uScale: u.uScale,
+        uRot: u.uRot,
+        uDisperse: u.uDisperse,
+        uOpacity: u.uOpacity,
+        uSize: { value: 90 },
+        uPixelRatio: { value: 1 },
+      },
+    });
+
+    this.embers = new Points(cloud, this.emberMaterial);
+    this.embers.frustumCulled = false;
+    this.embers.renderOrder = 1;
+    this.scene.add(this.embers);
+
+    this.emberGeometry = cloud;
   }
 
   _initComposer(quality) {
@@ -171,6 +253,10 @@ export default class VolumetricFire {
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
 
+    // Embers are small and sharp, so they get the real ratio rather than the
+    // reduced one the raymarch renders at.
+    this.emberMaterial.uniforms.uPixelRatio.value = dpr;
+
     this.composer.setPixelRatio(dpr);
     this.composer.setSize(w, h);
     this.bloom.setSize(w, h);
@@ -198,7 +284,9 @@ export default class VolumetricFire {
   dispose() {
     this.disposed = true;
     this.quadGeometry.dispose();
+    this.emberGeometry.dispose();
     this.material.dispose();
+    this.emberMaterial.dispose();
     this.bloom.dispose();
     this.composer.dispose();
     this.renderer.dispose();
