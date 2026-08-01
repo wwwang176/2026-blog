@@ -199,49 +199,6 @@ export function buildMonogramGeometry({ quality = "high" } = {}) {
 }
 
 /**
- * Averaged normals for coincident vertices.
- *
- * The geometry is flat-shaded and non-indexed, so every triangle owns its own
- * copies of its corners with its own face normal. Displacing along those
- * normals pulls neighbouring faces in different directions and the surface
- * tears into shards. Anything that inflates the mesh — the flame shell — has
- * to push along a normal the neighbours agree on.
- */
-export function computeSmoothNormals(geometry) {
-  const pos = geometry.getAttribute("position").array;
-  const nor = geometry.getAttribute("normal").array;
-
-  const key = (i) =>
-    `${pos[i].toFixed(4)},${pos[i + 1].toFixed(4)},${pos[i + 2].toFixed(4)}`;
-
-  const sums = new Map();
-
-  for (let i = 0; i < pos.length; i += 3) {
-    const k = key(i);
-    let entry = sums.get(k);
-    if (!entry) {
-      entry = [0, 0, 0];
-      sums.set(k, entry);
-    }
-    entry[0] += nor[i];
-    entry[1] += nor[i + 1];
-    entry[2] += nor[i + 2];
-  }
-
-  const out = new Float32Array(pos.length);
-
-  for (let i = 0; i < pos.length; i += 3) {
-    const [x, y, z] = sums.get(key(i));
-    const len = Math.hypot(x, y, z) || 1;
-    out[i] = x / len;
-    out[i + 1] = y / len;
-    out[i + 2] = z / len;
-  }
-
-  return out;
-}
-
-/**
  * Area-weighted surface sampling.
  *
  * Rolled by hand rather than pulled from `three/examples/jsm` for two reasons:
