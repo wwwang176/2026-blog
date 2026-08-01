@@ -520,10 +520,23 @@ export const grainVertex = /* glsl */ `
     // one sheet of noise sliding across the mark and the mark may as well not
     // be there — which is most of why it read as television static rather than
     // as moving air.
-    float d0 = sdOutline(p.xy);
+    //
+    // The obstacle has to shrink as the mark does. The body erodes away over
+    // the scroll and by the end there is nothing left, but this was testing
+    // the letterform the mark started as — so the air went on flowing round a
+    // CW that had been blown away some time ago, and the shape stayed legible
+    // in the pattern of the dust long after it was gone from the ground.
+    //
+    // The offset is the mean of what the body's own erosion term does to its
+    // distance field. It does not need the patchiness: the flow only has to
+    // stop when the thing it is flowing round does.
+    float gone = uErosion * 0.85;
+
+    float raw = sdOutline(p.xy);
+    float d0 = raw + gone;
     vec2 grad = vec2(
-      sdOutline(p.xy + vec2(0.07, 0.0)) - d0,
-      sdOutline(p.xy + vec2(0.0, 0.07)) - d0
+      sdOutline(p.xy + vec2(0.07, 0.0)) - raw,
+      sdOutline(p.xy + vec2(0.0, 0.07)) - raw
     );
     float near = smoothstep(0.95, -0.15, d0);
     p.xy += normalize(grad + 1e-5) * near * uDeflect;
@@ -531,7 +544,7 @@ export const grainVertex = /* glsl */ `
     // And behind it the air stays disturbed for a while. The wake is sampled
     // offset downwind of the letterform rather than centred on it, because
     // that is where a wake is.
-    float wake = smoothstep(1.5, -0.2, sdOutline(p.xy + vec2(1.4, 0.0)));
+    float wake = smoothstep(1.5, -0.2, sdOutline(p.xy + vec2(1.4, 0.0)) + gone);
     p.y += sin(uTime * 3.1 + aSeed * 4.0) * wake * 0.30;
     p.z += cos(uTime * 2.6 + aSeed * 6.0) * wake * 0.24;
 
