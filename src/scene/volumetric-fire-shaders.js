@@ -327,6 +327,17 @@ export const volumeFragment = /* glsl */ `
   }
 
   vec2 fieldAt(vec3 p) {
+    // The ceiling is evaluated first, and it is the only thing here that
+    // depends on the unwarped position alone. Where it has closed, nothing
+    // downstream can contribute, so three fbm and two distance evaluations
+    // never run — and above the flame is most of the box by volume. The
+    // result is identical; the work simply stops earlier.
+    vec3 cp = vec3(p.x * 1.15, uTime * 1.58, p.z * 1.15);
+    float column = vnoise(cp) * 0.66 + vnoise(cp * 2.7 + 5.1) * 0.34;
+    float top = 0.7 + column * 4.2;
+    float lid = 1.0 - smoothstep(top - 1.3, top, p.y);
+    if (lid <= 0.0) return vec2(0.0);
+
     vec3 q = p * vec3(1.85, 0.72, 1.85) + vec3(0.0, -uTime * 3.9, uTime * 0.3);
 
     float n1 = fbm(q);
@@ -352,8 +363,6 @@ export const volumeFragment = /* glsl */ `
           (n3 - 0.5) * (1.0 + above * 0.9)
         ) * grow;
 
-    float d = sdMonogram(warped);
-
     float turb = n1 * 0.62 + n2 * 0.38;
 
     // The flame wraps the fuel instead of being made of it. Density lives in
@@ -371,18 +380,28 @@ export const volumeFragment = /* glsl */ `
     // these strokes are 0.46 wide so nothing inside them is ever more than
     // 0.23 from the outline — the threshold could not be reached and the
     // suppression sat at half strength across the whole letter.
+    // sdMonogram is max(outline, depth), so taking it apart here gives the
+    // rim test and the distance from one outline evaluation instead of two.
     float dxy = sdOutline(warped.xy);
     float dz = abs(warped.z) - 0.22;
+    float d = max(dxy, dz);
+
     float rim = smoothstep(-0.14, 0.14, dxy - dz);
+
+    float band = smoothstep(0.5, 0.04, d) * smoothstep(-0.1, 0.05, d) * rim;
 
     // Flame sits on top of what is burning, it does not wrap it. An even band
     // around the whole silhouette is not fire, it is a stroke around the
     // letters — which is exactly what it looked like. Asking whether the fuel
     // is just below the sample keeps it to the upward-facing parts and leaves
     // the undersides and outer flanks clear.
-    float onTop = smoothstep(0.28, -0.12, sdMonogram(warped - vec3(0.0, 0.32, 0.0)));
-
-    float shell = smoothstep(0.5, 0.04, d) * smoothstep(-0.1, 0.05, d) * rim * onTop * 0.68;
+    //
+    // Guarded, because where the band has already gone to zero the answer is
+    // multiplied away and the distance evaluation is pure waste.
+    float shell = 0.0;
+    if (band > 0.0) {
+      shell = band * smoothstep(0.28, -0.12, sdMonogram(warped - vec3(0.0, 0.32, 0.0))) * 0.68;
+    }
 
     // Material that has climbed clear of the fuel is no longer attached to a
     // surface, so the band restriction lifts and the plume fills out.
@@ -395,18 +414,12 @@ export const volumeFragment = /* glsl */ `
     // survives is a few tongues with no word under them.
     float filled = body * (1.0 - uFuel) * 1.7;
 
+    // lid is the per-column ceiling computed at the top of the function: a
+    // height that belongs to each part of the mark rather than to the frame.
+    // Fading on height alone gave every column the same ceiling and a top edge
+    // running parallel to the letters, which was the tell.
     float dens = max(mix(shell, max(shell, body), detached), filled)
-      * (0.22 + turb * 0.8);
-
-    // A ceiling that belongs to each column rather than to the frame. Fading
-    // on height alone gave every part of the flame the same height and a top
-    // edge running parallel to the letters — the tell. Sampling noise that
-    // varies across x and z but not y, and drifts in time, means each part of
-    // the mark burns to its own height and keeps changing its mind.
-    vec3 cp = vec3(p.x * 1.15, uTime * 1.58, p.z * 1.15);
-    float column = vnoise(cp) * 0.66 + vnoise(cp * 2.7 + 5.1) * 0.34;
-    float top = 0.7 + column * 4.2;
-    dens *= 1.0 - smoothstep(top - 1.3, top, p.y);
+      * (0.22 + turb * 0.8) * lid;
 
     return vec2(max(dens, 0.0), turb);
   }

@@ -5,3 +5,6 @@ dist
 *.local
 .DS_Store
 Thumbs.db
+
+# playwright-cli scratch output
+.playwright-cli/
