@@ -65,11 +65,15 @@ export default class GranularField {
 
     // The same policy as the other two: a count rather than a fraction, so the
     // frame rate does not depend on the size of the display.
-    this.pixelBudget = quality === "low" ? 280e3 : quality === "medium" ? 420e3 : 560e3;
+    // Lower than the other two. The air pass is a second volumetric march over
+    // the whole frame and it roughly doubled the cost of this scene, so the
+    // resolution is what pays for it — a soft matte body upscaled is a much
+    // smaller loss than the atmosphere would be.
+    this.pixelBudget = quality === "low" ? 190e3 : quality === "medium" ? 260e3 : 340e3;
     this.renderScale = 0.7;
 
     this._initRenderer();
-    this._initScene();
+    this._initScene(quality);
     this._initComposer();
     this.resize();
   }
@@ -86,7 +90,7 @@ export default class GranularField {
     this.renderer.toneMappingExposure = 1.0;
   }
 
-  _initScene() {
+  _initScene(quality) {
     this.scene = new Scene();
     this.camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
@@ -118,23 +122,34 @@ export default class GranularField {
         // Thicker than the fire's 0.22. A lit opaque body needs enough depth
         // for the light to fall off across it; at the fire's thickness the
         // strokes read as ribbon.
-        uDepth: { value: 0.34 },
+        uDepth: { value: 0.36 },
         // Frequency against amplitude is the whole texture. High and shallow
         // is dry fine sand; low and deep is gravel.
         uGrainFreq: { value: 44 },
         uGrainAmp: { value: 0.032 },
         uErosion: { value: 0 },
         uWind: { value: 0.6 },
-        uAO: { value: 2.2 },
+        uAO: { value: 1.5 },
+        // Above grain scale: bedding, wind flutes, and hollows. One frequency
+        // of noise everywhere gave a letterform evenly coated in crumb with no
+        // internal composition at all.
+        uStrata: { value: 0.028 },
+        uFlute: { value: 0.075 },
+        uPocket: { value: 0.085 },
+        // The air. uShaft is how hard the sun burns through the dust, uHaze how
+        // fast the dust hides what is behind it.
+        uShaft: { value: 1.6 },
+        uHaze: { value: 0.22 },
+        uAirSteps: { value: quality === "low" ? 8 : quality === "medium" ? 10 : 12 },
         // How bright the mass is allowed to get. Low, so the airborne grains
         // have something dark to read against.
-        uLevel: { value: 0.42 },
+        uLevel: { value: 0.6 },
         // Gusting, written once per frame and shared with the grains.
         uGust: { value: 1 },
         // Warm neutral, and deliberately the least saturated of the three —
         // fire took the accent and water took the cool one, so this is the
         // element with no colour of its own.
-        uSand: { value: new Color(0.72, 0.56, 0.38) },
+        uSand: { value: new Color(0.80, 0.62, 0.42) },
         uSteps: { value: this.steps },
       },
     });
@@ -217,6 +232,7 @@ export default class GranularField {
         uWind: u.uWind,
         uGust: u.uGust,
         uSand: u.uSand,
+        uDeflect: { value: 0.55 },
         // Additive, so this is the level *after* overlap. At one the field piled
         // up into a whiteout that buried the mark entirely — a hundred and ten
         // thousand streaks average several deep over any given pixel, and each
