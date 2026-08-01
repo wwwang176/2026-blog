@@ -115,6 +115,7 @@ export const fireballVertex = /* glsl */ `
   varying float vLife;
   varying float vSeed;
   varying float vDepth;
+  varying float vHeight;
 
   void main() {
     vec3 p = aAnchor * uModelScale;
@@ -126,11 +127,30 @@ export const fireballVertex = /* glsl */ `
 
     vec3 field = flow(aAnchor, uTime);
 
-    // Rise and drift while alive. Kept small on purpose — the anchors carry
-    // the letterform, so movement has to stay inside it or the word dissolves.
-    p.y += life * (0.7 + hash11(aSeed + 3.1) * 0.85 + field.y * 0.3);
-    p.x += field.x * 0.2 * life;
-    p.z += field.z * 0.17 * life;
+    // Movement used to be clamped tight to keep the word legible, and that is
+    // exactly why it read as glowing coals: a flame is defined by rising, and
+    // nothing here rose. The constraint is lifted and legibility is protected
+    // a different way — heat and opacity now fall off with height, so the
+    // letterform lives in the bright base while everything that escapes
+    // upward is dim by the time it could blur the shape.
+    // Scaled against the letterform, which stands about 2 units tall here.
+    // The first attempt at this ran to 17 and the plume simply buried the
+    // word — a flame reads as a flame relative to what is burning, and a
+    // column three times the height of its fuel is a bonfire, not lettering.
+    float lift = 0.85 + hash11(aSeed + 3.1) * 1.0;
+
+    // A minority climb further and become the tongues that break the outline.
+    // Without a few of these the mass has a flat, even ceiling.
+    float tongue = step(0.86, hash11(aSeed + 19.1));
+    lift *= 1.0 + tongue * 1.7;
+
+    float rise = life * lift;
+    vHeight = clamp(rise / 2.6, 0.0, 1.0);
+
+    p.y += rise + field.y * 0.22 * life;
+    // Spread widens with height, the way a plume does.
+    p.x += field.x * (0.18 + vHeight * 0.4) * life;
+    p.z += field.z * (0.15 + vHeight * 0.3) * life;
 
     // Dispersal is the only thing that breaks the letters, and it is scroll
     // driven rather than part of the idle loop.
@@ -145,9 +165,13 @@ export const fireballVertex = /* glsl */ `
     vSeed = aSeed;
 
     // Swell fast, fade slow — a flame's silhouette is not symmetric in time.
-    float swell = smoothstep(0.0, 0.16, life) * (1.0 - smoothstep(0.42, 1.0, life));
+    float swell = smoothstep(0.0, 0.12, life) * (1.0 - smoothstep(0.4, 1.0, life));
 
-    gl_PointSize = uSize * aScale * swell * uIntensity * uPixelRatio / max(vDepth, 0.001);
+    // Real flame is never steady. A fast wobble, uncorrelated between balls,
+    // is what stops the mass looking like it is lit by a lamp.
+    float flicker = 0.82 + 0.18 * sin(uTime * 13.0 + aSeed * 5.7);
+
+    gl_PointSize = uSize * aScale * swell * flicker * uIntensity * uPixelRatio / max(vDepth, 0.001);
     gl_Position = projectionMatrix * mv;
   }
 `;
@@ -165,6 +189,7 @@ export const fireballFragment = /* glsl */ `
   varying float vLife;
   varying float vSeed;
   varying float vDepth;
+  varying float vHeight;
 
   void main() {
     vec2 uv = gl_PointCoord - 0.5;
@@ -177,24 +202,31 @@ export const fireballFragment = /* glsl */ `
     vec2 q = uv * 3.6 + vec2(vSeed * 7.3, vSeed * 3.1 - uTime * 2.4);
     float n = fbm2(q);
 
-    // Flames narrow as they climb, and the same noise eats the silhouette so
-    // the outline is ragged rather than circular.
-    float stretch = 1.0 - max(uv.y, 0.0) * 0.5;
+    // Tapering hard, and harder the higher it has climbed. A shape that is
+    // wide at the bottom and comes to a point at the top is the most
+    // recognisable thing about a flame — more so than its colour.
+    float taper = 0.55 + vHeight * 1.15;
+    float stretch = 1.0 - max(uv.y, 0.0) * taper;
     float radius = 0.5 * stretch - n * 0.17;
     if (d > radius) discard;
 
     float core = smoothstep(radius, radius * 0.12, d);
 
-    // Hot when young, hotter at the centre, and modulated by the churn. The
-    // gradient across one ball is most of what makes it read as flame.
-    float heat = (1.0 - vLife * 0.88) * 0.5 + core * 0.42 + (n - 0.5) * 0.3;
+    // The vertical temperature gradient across the whole mass, which is what
+    // was missing. Driving heat from a ball's own age gave a field of evenly
+    // glowing coals; driving it from height gives a white-hot base cooling
+    // through orange to deep red at the tips, which is the shape of fire.
+    float heat = (1.0 - vHeight * 0.95) * 0.66 + core * 0.3 + (n - 0.5) * 0.26;
     vec3 col = fireRamp(clamp(heat, 0.0, 1.0));
 
-    // Kept low deliberately. Additive stacking saturates the red channel
-    // first, and once it clips the green keeps climbing — which is why dense
-    // cores drifted yellow-green. Fewer balls reaching saturation keeps the
-    // hue where the ramp put it.
-    float alpha = core * (1.0 - smoothstep(0.45, 1.0, vLife)) * (0.22 + n * 0.42);
+    // Alpha falls away with height too. This is what buys back the legibility
+    // that letting the balls rise properly would otherwise cost — the plume
+    // is thin and dark long before it could smear the letterform.
+    float alpha = core
+      * (1.0 - smoothstep(0.45, 1.0, vLife))
+      * (1.0 - smoothstep(0.15, 0.95, vHeight))
+      * (0.22 + n * 0.42);
+
     float depthFade = smoothstep(46.0, 6.0, vDepth);
 
     gl_FragColor = vec4(col, alpha * uOpacity * depthFade);
