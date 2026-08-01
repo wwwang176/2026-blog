@@ -46,7 +46,10 @@ export default class VolumetricFire {
 
     // The dominant cost by far. Every step is two fbm evaluations and an SDF,
     // so this is the first thing to give on a weak device.
-    this.steps = quality === "low" ? 30 : quality === "medium" ? 42 : 56;
+    // Warping the sample rather than eroding the threshold gives a crisper
+    // boundary, so fewer samples are needed to resolve it than the earlier
+    // approach wanted.
+    this.steps = quality === "low" ? 26 : quality === "medium" ? 36 : 48;
 
     // Raymarching pays per pixel, and the result is soft — resolution is the
     // cheapest thing to spend here and the hardest to miss.

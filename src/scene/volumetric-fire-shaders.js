@@ -143,31 +143,38 @@ export const volumeFragment = /* glsl */ `
 
   varying vec2 vUv;
 
-  /** Density and the turbulence that produced it, so temperature can reuse it. */
+  /**
+   * Density and the turbulence that produced it, so temperature can reuse it.
+   *
+   * The important part is that the noise moves the sample rather than eroding
+   * the threshold. Subtracting noise from a distance field can only ever make
+   * a boundary fuzzy — it stays the boundary of the letter. Displacing the
+   * position and then asking the letter where that point falls lets the whole
+   * shape flow, which is what a tongue of flame actually is.
+   *
+   * The noise is also anisotropic. Flame structures are tall and narrow, so it
+   * is compressed along y and scrolled upward; sampling it isotropically was
+   * why the earlier version read as drifting cloud rather than as fire.
+   */
   vec2 fieldAt(vec3 p) {
-    // Advected downward through a stationary shape, which is what makes the
-    // structure appear to rise out of the letterform rather than slide across
-    // it. Two octave sets at different rates keeps the motion from looking
-    // like a single scrolling texture.
-    float n1 = fbm(p * 1.45 + vec3(0.0, -uTime * 1.25, uTime * 0.1));
-    float n2 = fbm(p * 3.30 + vec3(0.0, -uTime * 2.05, 0.0));
-    float turb = n1 * 0.7 + n2 * 0.3;
+    vec3 q = p * vec3(1.85, 0.72, 1.85) + vec3(0.0, -uTime * 1.55, uTime * 0.12);
 
-    float d = sdMonogram(p);
+    float n1 = fbm(q);
+    float n2 = fbm(q * 2.35 + 19.7);
+    float n3 = fbm(q * 0.62 - 7.3);
 
-    // How far the flame may stray from the surface, opening up with height.
-    // A constant here coats the letters evenly; the widening is the plume.
-    float room = 0.14 + smoothstep(-1.1, 2.1, p.y) * 0.75;
-    float shaped = d - (turb - 0.40) * room;
+    // Displacement is small at the base, where the letterform has to stay
+    // readable, and grows with height where the flame is free to break up.
+    float grow = 0.10 + smoothstep(-1.05, 2.0, p.y) * 0.92;
+    vec3 warped = p + vec3(n2 - 0.5, (n1 - 0.34) * 1.5, n3 - 0.5) * grow;
 
-    // Deliberately thin, and modulated by the same turbulence that shaped it.
-    // Saturating the interior was what turned the letters into solid slabs of
-    // gradient — the noise was there the whole time and nothing could be seen
-    // of it because every sample inside the shape was already fully opaque.
-    float dens = smoothstep(0.26, 0.0, shaped) * (0.18 + turb * 0.75);
+    float d = sdMonogram(warped);
+
+    float turb = n1 * 0.62 + n2 * 0.38;
+    float dens = smoothstep(0.20, -0.02, d) * (0.22 + turb * 0.8);
 
     // Taper, so the column thins out instead of ending on a flat ceiling.
-    dens *= 1.0 - smoothstep(0.4, 2.3, p.y);
+    dens *= 1.0 - smoothstep(0.35, 2.2, p.y);
 
     return vec2(max(dens, 0.0), turb);
   }
@@ -211,9 +218,10 @@ export const volumeFragment = /* glsl */ `
     float ds = 0.075;
     float dt = ds * uScale;
 
-    // The furthest the noise can push the surface outward. Anything beyond
-    // this is guaranteed empty, which is what makes skipping safe.
-    float reach = 0.95;
+    // The furthest a sample can be displaced and still land inside the letter,
+    // so anything beyond this is guaranteed empty. It has to cover the warp —
+    // up to about a unit vertically — or the skip clips the tongues off.
+    float reach = 1.75;
 
     vec3 col = vec3(0.0);
     float trans = 1.0;
