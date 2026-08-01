@@ -475,12 +475,15 @@ export const grainVertex = /* glsl */ `
   uniform float uGust;
   uniform float uFlowPhase;
   uniform float uDeflect;
+  uniform float uStreak;
   uniform float uSize;
   uniform float uPixelRatio;
 
   varying float vLife;
   varying float vSeed;
   varying float vNear;
+  varying vec2 vDir;
+  varying float vStretch;
 
   void main() {
     // Accumulated on the CPU, for the same reason the surface grain is: with
@@ -549,18 +552,59 @@ export const grainVertex = /* glsl */ `
       return;
     }
 
-    gl_Position = vec4(
+    vec2 ndc = vec2(
       world.x / (zc * uAspect * uTanHalfFov),
-      world.y / (zc * uTanHalfFov),
-      0.0, 1.0
+      world.y / (zc * uTanHalfFov)
+    );
+    gl_Position = vec4(ndc, 0.0, 1.0);
+
+    /* ── How the streak should lie ──────────────────────────────── */
+
+    // A motion streak points along the velocity and is as long as the distance
+    // covered while the frame is open. It was neither: a fixed horizontal
+    // squash, the same length however hard the wind blew. But these grains
+    // arc — they are lifted and dropped, they spread in z, and they are pushed
+    // aside by the letterform — so a horizontal streak is only right for the
+    // ones going straight across, and the rest were smeared across their own
+    // path.
+    //
+    // Differentiated along the flight, before the deflection and the wake. Both
+    // of those change slowly enough along the path that leaving them out is
+    // invisible, and putting them in would cost four more distance-field
+    // evaluations per grain.
+    vec3 vel = vec3(
+      -carry,
+      lift * (1.0 - 3.4 * life),
+      (hash11(aSeed + 31.7) - 0.5) * 3.2
+    ) * rate * (0.5 + uWind) * uGust;
+
+    vel.xz = inv * vel.xz;
+    vel *= uScale;
+
+    // Through the same projection, including the term from the grain closing
+    // on the camera — one travelling toward you streaks outward from centre
+    // frame, not along its own heading.
+    vec2 vndc = vec2(
+      (vel.x + ndc.x * uAspect * uTanHalfFov * vel.z) / (zc * uAspect * uTanHalfFov),
+      (vel.y + ndc.y * uTanHalfFov * vel.z) / (zc * uTanHalfFov)
     );
 
-    // The sprite is the length of the streak, not the thickness of the grain —
-    // the fragment squashes it across the wind, so a ten-pixel sprite draws a
-    // ten by two streak. Sized against the camera depth, which is where the
-    // fire's embers went wrong too: uSize over a depth of twenty-one is a very
-    // different number from uSize.
-    gl_PointSize = min(uSize * aScale * uPixelRatio / zc, 48.0 * uPixelRatio);
+    // Into sprite space, which is x right and y down, and where the two axes
+    // are equal pixels rather than equal clip space.
+    vec2 screen = vec2(vndc.x * uAspect, -vndc.y);
+    float sp = length(screen);
+    vDir = screen / max(sp, 1e-4);
+
+    // Against the speed a grain runs at with the wind at rest, so scroll
+    // lengthening the streaks falls out of it rather than being a second
+    // thing to tune.
+    float rel = clamp(sp, 0.35, 3.2);
+
+    vStretch = max(uStreak * rel, 1.0);
+
+    // The sprite has to hold the streak, so it grows with it — and the
+    // thickness stays put, because the fragment divides by the same number.
+    gl_PointSize = min(uSize * aScale * rel * uPixelRatio / zc, 64.0 * uPixelRatio);
   }
 `;
 
@@ -571,19 +615,27 @@ export const grainFragment = /* glsl */ `
   uniform float uErosion;
   uniform float uDust;
   uniform float uGust;
-  uniform float uStreak;
   uniform vec3 uSand;
 
   varying float vLife;
   varying float vSeed;
   varying float vNear;
+  varying vec2 vDir;
+  varying float vStretch;
 
   void main() {
-    // Drawn as a streak rather than a dot, by squashing the sprite across the
-    // wind. A grain crossing the frame this fast covers several pixels while
-    // the frame is open, so a round point is what it looks like stopped — and a
-    // field of round points reads as a starfield however many there are.
-    vec2 q = (gl_PointCoord - 0.5) * vec2(1.0, uStreak);
+    // Drawn as a streak rather than a dot: a grain crossing the frame this fast
+    // covers several pixels while the frame is open, so a round point is what
+    // it looks like stopped, and a field of round points reads as a starfield
+    // however many there are.
+    //
+    // Squashed across its own heading rather than across the screen. The
+    // heading and the length both arrive from the vertex shader, so a grain
+    // arcing upward streaks upward and a faster wind draws longer streaks
+    // without anything here having to know about the wind.
+    vec2 c = gl_PointCoord - 0.5;
+    vec2 across = vec2(-vDir.y, vDir.x);
+    vec2 q = vec2(dot(c, vDir), dot(c, across) * vStretch);
     float d = length(q);
     if (d > 0.5) discard;
 
