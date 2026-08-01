@@ -70,7 +70,18 @@ export default class VolumetricFire {
 
     // Raymarching pays per pixel, and the result is soft — resolution is the
     // cheapest thing to spend here and the hardest to miss.
-    this.renderScale = quality === "low" ? 0.32 : quality === "medium" ? 0.38 : 0.45;
+    //
+    // Spent as a fixed count rather than as a fraction of the window, because
+    // the cost is linear in the count and in nothing much else. As a fraction
+    // the frame rate depended on the display: the hundred this was tuned to
+    // was a hundred at 1440x900 and a good deal less on anything larger. These
+    // are the counts the old fractions gave at that size, so it renders
+    // identically there.
+    this.pixelBudget =
+      quality === "low" ? 132e3 : quality === "medium" ? 187e3 : 262e3;
+
+    // Derived in resize().
+    this.renderScale = 0.45;
 
     this.heroOffset = new Vector2(0, 0);
 
@@ -257,7 +268,17 @@ export default class VolumetricFire {
     // footprint and has to be inside the frame too.
     this.material.uniforms.uScale.value = aspect < 1 ? 1.25 : 1.75;
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2) * this.renderScale;
+    const base = Math.min(window.devicePixelRatio || 1, 2);
+    // The floor is not about the silhouette, which a volume does not really
+    // have — it is about the dither. The entry-point noise was sized against
+    // 0.45, and upscaling it much beyond three times turns it from a texture
+    // into coarse grain across the plume.
+    this.renderScale = Math.min(
+      0.6,
+      Math.max(0.3, Math.sqrt(this.pixelBudget / (w * h * base * base)))
+    );
+
+    const dpr = base * this.renderScale;
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
 
@@ -267,8 +288,13 @@ export default class VolumetricFire {
 
     this.composer.setPixelRatio(dpr);
     this.composer.setSize(w, h);
-    // After the composer, which would otherwise reset it to full size.
-    this.bloom.setSize(w * this.bloomScale, h * this.bloomScale);
+
+    // After the composer, which would otherwise reset it to match. Note the
+    // dpr: bloomScale is a fraction of the *rendered* size, not of the window.
+    // Without it the bloom ignored renderScale completely — it was running on
+    // more pixels than the raymarch it was blurring, and it scaled with the
+    // display rather than with the budget.
+    this.bloom.setSize(w * dpr * this.bloomScale, h * dpr * this.bloomScale);
   }
 
   tick(dt) {

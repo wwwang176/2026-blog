@@ -146,7 +146,7 @@ import "../../styles/main.css";
       }
 
       .lab-hud #fps {
-        min-width: 4.5em;
+        min-width: 8em;
         color: var(--muted);
       }
 
@@ -226,9 +226,12 @@ import "../../styles/main.css";
         ["tint", 0, 2, 0.02,
           () => field.material.uniforms.uTint.value,
           (v) => { field.material.uniforms.uTint.value = v; }],
-        ["res", 0.3, 1.2, 0.05,
-          () => field.renderScale,
-          (v) => { field.renderScale = v; field.resize(); }],
+        // Megapixels, not a fraction of the window — the fraction is derived
+        // from this and is what the readout below shows. Stated this way the
+        // number means the same thing on every display.
+        ["budget", 0.2, 2.0, 0.05,
+          () => field.pixelBudget / 1e6,
+          (v) => { field.pixelBudget = v * 1e6; field.resize(); }],
       ];
 
       for (const [name, min, max, step, get, set] of CONTROLS) {
@@ -321,7 +324,10 @@ import "../../styles/main.css";
         acc += dt;
         frames++;
         if (acc >= 0.5) {
-          fpsEl.textContent = `${Math.round(frames / acc)} fps`;
+          // The scale is derived from the budget and the window, so it is the
+          // thing worth watching when either changes.
+          fpsEl.textContent =
+            `${Math.round(frames / acc)} fps · ${field.renderScale.toFixed(2)}×`;
           frames = 0;
           acc = 0;
         }

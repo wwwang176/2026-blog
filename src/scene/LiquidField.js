@@ -64,12 +64,27 @@ export default class LiquidField {
     // grazing the surface, and stopping it early costs an edge pixel.
     this.steps = quality === "low" ? 48 : quality === "medium" ? 72 : 96;
 
-    // Deliberately higher than the fire's 0.45. A volume is soft everywhere so
-    // resolution was the cheapest thing to give up; a surface has a silhouette
-    // and gives it up very badly. Measured at 1440x900: 0.7 runs at 111fps and
-    // 0.9 at 82, and the silhouette at 0.7 is clean because the near-miss
-    // feather is carrying it.
-    this.renderScale = quality === "low" ? 0.4 : quality === "medium" ? 0.55 : 0.7;
+    // Rendered pixels the raymarch is allowed, whatever size the window is.
+    //
+    // This is a budget rather than a fraction of the window because the cost
+    // is linear in it and in nothing much else. A fixed fraction meant the
+    // frame rate depended on the display: 1440x900 rendered 0.63M pixels and
+    // ran at 120fps, and the same setting on a 1440p screen rendered 1.80M and
+    // ran at 47. Holding the count fixed instead spends the same everywhere
+    // and lets the scale fall out of it.
+    //
+    // 635e3 is what 1440x900 was tuned at, and it still reaches the display's
+    // ceiling there — but a 1440p window costs more to composite even when it
+    // renders the same count, and at 635e3 it lands around 93. Backed off to
+    // where both hold above a hundred. The lab exposes this in megapixels, so
+    // it can be dialled at whatever resolution it is actually being watched.
+    this.pixelBudget = quality === "low" ? 280e3 : quality === "medium" ? 400e3 : 540e3;
+
+    // Derived in resize(). A surface has a silhouette and gives up resolution
+    // far worse than the fire's volume did, so the ceiling is well above the
+    // fire's 0.45 — but the near-miss feather is what makes the floor
+    // survivable on a very large display.
+    this.renderScale = 0.7;
 
     // Cohesion at rest, and the one number that decides whether this reads as
     // droplets or as a poured letterform. It is not free: a wider blend makes
@@ -390,7 +405,13 @@ export default class LiquidField {
     // headroom something rising off it needs.
     this.material.uniforms.uScale.value = aspect < 1 ? 1.7 : 2.4;
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2) * this.renderScale;
+    const base = Math.min(window.devicePixelRatio || 1, 2);
+    this.renderScale = Math.min(
+      0.85,
+      Math.max(0.28, Math.sqrt(this.pixelBudget / (w * h * base * base)))
+    );
+
+    const dpr = base * this.renderScale;
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
 
@@ -402,8 +423,14 @@ export default class LiquidField {
 
     this.composer.setPixelRatio(dpr);
     this.composer.setSize(w, h);
-    // After the composer, which would otherwise reset it to full size.
-    this.bloom.setSize(w * this.bloomScale, h * this.bloomScale);
+
+    // After the composer, which would otherwise reset it to match. Note the
+    // dpr: bloomScale is a fraction of the *rendered* size, not of the window.
+    // Without it the bloom ignores renderScale entirely and scales with the
+    // display instead — at 1440p that had it running on more pixels than the
+    // raymarch it was blurring, and it was most of what was left after the
+    // pixel budget had flattened everything else.
+    this.bloom.setSize(w * dpr * this.bloomScale, h * dpr * this.bloomScale);
   }
 
   tick(dt) {
