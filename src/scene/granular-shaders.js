@@ -527,10 +527,14 @@ export const grainVertex = /* glsl */ `
     // CW that had been blown away some time ago, and the shape stayed legible
     // in the pattern of the dust long after it was gone from the ground.
     //
-    // The offset is the mean of what the body's own erosion term does to its
-    // distance field. It does not need the patchiness: the flow only has to
-    // stop when the thing it is flowing round does.
-    float gone = uErosion * 0.85;
+    // The offset runs ahead of what the body's erosion does to its own
+    // distance field, which averages about 0.82 of the erosion. Matching that
+    // exactly was still too late: the mark reads as gone well before it is
+    // mathematically gone, because it fragments and thins and the haze takes
+    // what is left, while a stub too small to see was still parting the air
+    // around it. Air flowing round something that thin is barely deflected
+    // anyway, so leading it is both the better match and the truer one.
+    float gone = uErosion * 1.9;
 
     float raw = sdOutline(p.xy);
     float d0 = raw + gone;
