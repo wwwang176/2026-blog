@@ -122,7 +122,7 @@ export default class GranularField {
         // Thicker than the fire's 0.22. A lit opaque body needs enough depth
         // for the light to fall off across it; at the fire's thickness the
         // strokes read as ribbon.
-        uDepth: { value: 0.36 },
+        uDepth: { value: 0.30 },
         // Frequency against amplitude is the whole texture. High and shallow
         // is dry fine sand; low and deep is gravel.
         uGrainFreq: { value: 44 },
@@ -135,10 +135,10 @@ export default class GranularField {
         // internal composition at all.
         uStrata: { value: 0.028 },
         uFlute: { value: 0.075 },
-        uPocket: { value: 0.085 },
+        uPocket: { value: 0.165 },
         // The air. uShaft is how hard the sun burns through the dust, uHaze how
         // fast the dust hides what is behind it.
-        uShaft: { value: 1.6 },
+        uShaft: { value: 0.2 },
         uHaze: { value: 0.22 },
         uAirSteps: { value: quality === "low" ? 8 : quality === "medium" ? 10 : 12 },
         // How bright the mass is allowed to get. Low, so the airborne grains
