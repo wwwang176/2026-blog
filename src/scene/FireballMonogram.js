@@ -4,6 +4,7 @@ import {
   BufferAttribute,
   BufferGeometry,
   Group,
+  NormalBlending,
   PerspectiveCamera,
   Points,
   Scene,
@@ -13,7 +14,12 @@ import {
 } from "three";
 
 import { buildMonogramGeometry, sampleSurface } from "./monogram-geometry.js";
-import { fireballFragment, fireballVertex } from "./fireball-shaders.js";
+import {
+  fireballFragment,
+  fireballVertex,
+  smokeFragment,
+  smokeVertex,
+} from "./fireball-shaders.js";
 
 /** Deterministic PRNG so the swarm is identical on every load. */
 function makeRandom(seed = 20260801) {
@@ -79,7 +85,7 @@ export default class FireballMonogram {
     // is exactly where the letterform is densest. Without tone mapping every
     // one of those cores clips to flat white and the word turns to paper.
     this.renderer.toneMapping = ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
+    this.renderer.toneMappingExposure = 0.9;
   }
 
   _initScene() {
@@ -151,7 +157,33 @@ export default class FireballMonogram {
 
     this.points = new Points(cloud, this.material);
     this.points.frustumCulled = false;
+    this.points.renderOrder = 0;
     this.root.add(this.points);
+
+    // Smoke shares the anchors but runs its own cycle. Normal blending, drawn
+    // after the flame, because its entire job is to take brightness away —
+    // additive can only add, and fire with no dark in it never looks real.
+    this.smokeMaterial = new ShaderMaterial({
+      vertexShader: smokeVertex,
+      fragmentShader: smokeFragment,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+      blending: NormalBlending,
+      uniforms: {
+        uTime: { value: 0 },
+        uSize: { value: 780 },
+        uPixelRatio: { value: 1 },
+        uModelScale: { value: 1 },
+        uDisperse: { value: 0 },
+        uOpacity: { value: 1 },
+      },
+    });
+
+    this.smoke = new Points(cloud, this.smokeMaterial);
+    this.smoke.frustumCulled = false;
+    this.smoke.renderOrder = 1;
+    this.root.add(this.smoke);
 
     this.cloudGeometry = cloud;
     geometry.dispose();
@@ -161,10 +193,18 @@ export default class FireballMonogram {
   setProgress(value) {
     this.progress = value;
 
-    this.material.uniforms.uIntensity.value = 1 + range(value, ...STAGE.flareUp) * 0.45;
-    this.material.uniforms.uDisperse.value = range(value, ...STAGE.disperse);
-    this.material.uniforms.uOpacity.value =
-      this.baseOpacity * (1 - range(value, ...STAGE.fadeOut) * 0.75);
+    const disperse = range(value, ...STAGE.disperse);
+    const fade = this.baseOpacity * (1 - range(value, ...STAGE.fadeOut) * 0.75);
+
+    // Restrained on purpose. At 0.45 the balls merged into one white-yellow
+    // mass and stopped reading individually, which is the thing that makes
+    // this work in the first place.
+    this.material.uniforms.uIntensity.value = 1 + range(value, ...STAGE.flareUp) * 0.18;
+    this.material.uniforms.uDisperse.value = disperse;
+    this.material.uniforms.uOpacity.value = fade;
+
+    this.smokeMaterial.uniforms.uDisperse.value = disperse;
+    this.smokeMaterial.uniforms.uOpacity.value = fade;
   }
 
   /** Normalised pointer offset, roughly -1 → 1 on each axis. */
@@ -191,9 +231,11 @@ export default class FireballMonogram {
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
     this.material.uniforms.uPixelRatio.value = dpr;
+    this.smokeMaterial.uniforms.uPixelRatio.value = dpr;
 
     this.modelScale = aspect < 1 ? 1.9 : 2.6;
     this.material.uniforms.uModelScale.value = this.modelScale;
+    this.smokeMaterial.uniforms.uModelScale.value = this.modelScale;
   }
 
   tick(dt) {
@@ -201,6 +243,7 @@ export default class FireballMonogram {
 
     this.time += dt;
     this.material.uniforms.uTime.value = this.time;
+    this.smokeMaterial.uniforms.uTime.value = this.time;
 
     this.pointer.lerp(this.pointerTarget, 0.045);
 
@@ -220,6 +263,7 @@ export default class FireballMonogram {
     this.disposed = true;
     this.cloudGeometry.dispose();
     this.material.dispose();
+    this.smokeMaterial.dispose();
     this.renderer.dispose();
   }
 }
