@@ -70,7 +70,7 @@ export default class VolumetricFire {
 
     // Raymarching pays per pixel, and the result is soft — resolution is the
     // cheapest thing to spend here and the hardest to miss.
-    this.renderScale = quality === "low" ? 0.45 : quality === "medium" ? 0.55 : 0.65;
+    this.renderScale = quality === "low" ? 0.32 : quality === "medium" ? 0.38 : 0.45;
 
     this.heroOffset = new Vector2(0, 0);
 
