@@ -154,10 +154,11 @@ export const emberVertex = /* glsl */ `
 
   varying float vLife;
   varying float vSeed;
+  varying float vNear;
 
   void main() {
     // Each ember runs its own slow loop, well out of step with its neighbours.
-    float rate = 0.14 + hash11(aSeed) * 0.2;
+    float rate = 0.28 + hash11(aSeed) * 0.4;
     float life = fract(aSeed * 0.613 + uTime * rate);
 
     vec3 p = aAnchor;
@@ -167,11 +168,20 @@ export const emberVertex = /* glsl */ `
 
     // Each ember keeps a heading of its own for the whole of its life, at its
     // own distance. Oscillating around the anchor made them sway in place and
-    // stay in a slab; a held direction sends them off front, back and to both
-    // sides, and the squared term lets them run wider as they climb.
+    // stay in a slab; a held direction sends them off in every direction, and
+    // the squared term lets them run wider as they climb.
     float angle = hash11(aSeed + 12.9) * 6.2831853;
-    float reach = 0.5 + hash11(aSeed + 31.7) * 3.1;
-    p.xz += vec2(cos(angle), sin(angle)) * reach * life * life;
+    float reach = 0.5 + hash11(aSeed + 31.7) * 3.0;
+    p.x += cos(angle) * reach * life * life;
+    p.z += sin(angle) * reach * 0.7 * life * life;
+
+    // A minority are thrown hard at the viewer. Spreading only across the
+    // screen plane keeps every ember at the same distance and reads flat —
+    // depth is only legible when something crosses it, and one drifting past
+    // the camera does more for the sense of space than any amount of lateral
+    // scatter. Squared, so most stay near the fire and a few really travel.
+    float toward = pow(hash11(aSeed + 47.3), 3.0);
+    p.z += toward * 13.0 * life * life;
 
     // A wobble on top, so the path is not a straight radial line.
     p.x += sin(uTime * 1.5 + aSeed * 7.0) * life * 0.65;
@@ -196,7 +206,24 @@ export const emberVertex = /* glsl */ `
     vLife = life;
     vSeed = aSeed;
 
-    gl_PointSize = uSize * aScale * (1.0 - life * 0.55) * uPixelRatio / max(zc, 0.001);
+    // Anything that reaches the camera has to be gone before it gets there.
+    // The perspective divide sends the sprite to infinity at zero and flips it
+    // once the ember passes behind, so it fades out over the last stretch of
+    // approach instead — which is also how a real one leaves frame.
+    vNear = smoothstep(1.0, 6.5, zc);
+
+    if (zc < 0.6) {
+      gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+      gl_PointSize = 0.0;
+      return;
+    }
+
+    // Capped for the same reason: a near miss would otherwise fill the screen
+    // with one sprite.
+    gl_PointSize = min(
+      uSize * aScale * (1.0 - life * 0.55) * uPixelRatio / zc,
+      64.0 * uPixelRatio
+    );
     gl_Position = vec4(ndc, 0.0, 1.0);
   }
 `;
@@ -209,6 +236,7 @@ export const emberFragment = /* glsl */ `
 
   varying float vLife;
   varying float vSeed;
+  varying float vNear;
 
   void main() {
     float d = length(gl_PointCoord - 0.5);
@@ -226,6 +254,7 @@ export const emberFragment = /* glsl */ `
     float alpha = pow(core, 2.2)
       * smoothstep(0.0, 0.06, vLife)
       * (1.0 - smoothstep(0.45, 1.0, vLife))
+      * vNear
       * flicker;
 
     gl_FragColor = vec4(col, alpha * uOpacity);

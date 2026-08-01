@@ -144,7 +144,7 @@ export default class VolumetricFire {
 
   _initEmbers() {
     const rand = makeRandom();
-    const count = 900;
+    const count = 450;
 
     // The mesh builder is used once, purely to scatter anchors over the same
     // letterform the distance field describes, then discarded. It is the only
