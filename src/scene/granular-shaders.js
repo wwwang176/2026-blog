@@ -305,16 +305,19 @@ export const granularFragment = /* glsl */ `
       float dens = dustDensity(p);
 
       if (dens > 0.02) {
-        // Only a thin slab of the air can be in shadow at all, and the trace
-        // to find that out is the expensive part of this loop — so it only
-        // runs where the answer can be anything but lit.
+        // The shadow trace is the expensive part of this loop, and it exists
+        // for the shafts. It only modulates the scattered term, so once the
+        // shaft is turned down far enough that the term is a fifth of the sun,
+        // it is shading something already too dim to see — and the air pass
+        // becomes what it is being used for at that setting, which is
+        // extinction, and extinction does not care where the shadow is.
         //
-        // The z bound does the most work. The sun sits almost in the xz plane
-        // and the mark is barely a third of a unit thick, so its shadow stays
-        // within about a unit of z however far it is thrown — while the dust
-        // box is nearly seven units deep. Most of the air is nowhere near the
-        // shadow and always was.
-        bool couldShade = p.x > -3.4 && p.x < 5.5
+        // Where it does run, the bounds are tight. The z one does the most
+        // work: the sun sits almost in the xz plane and the mark is barely a
+        // third of a unit thick, so its shadow stays within about a unit of z
+        // however far it is thrown, while the dust box is nearly seven deep.
+        bool couldShade = uShaft > 0.35
+                       && p.x > -3.4 && p.x < 5.5
                        && abs(p.y) < 2.4 && abs(p.z) < 1.1;
         float lit = couldShade ? sunReach(p) : 1.0;
 

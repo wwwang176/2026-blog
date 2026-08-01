@@ -140,7 +140,7 @@ export default class GranularField {
         // fast the dust hides what is behind it.
         uShaft: { value: 0.2 },
         uHaze: { value: 0.22 },
-        uAirSteps: { value: quality === "low" ? 8 : quality === "medium" ? 10 : 12 },
+        uAirSteps: { value: quality === "low" ? 4 : quality === "medium" ? 5 : 6 },
         // How bright the mass is allowed to get. Low, so the airborne grains
         // have something dark to read against.
         uLevel: { value: 0.6 },
