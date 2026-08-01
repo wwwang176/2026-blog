@@ -40,17 +40,21 @@ export const meshFragment = /* glsl */ `
     // Two hard-coded lights rather than real ones: the look is fully art
     // directed and the scene stays free of lighting setup. The key is kept
     // near-neutral — tinting key and rim both read as bruised purple.
-    float key  = max(dot(n, normalize(vec3(0.55, 0.85, 0.5))), 0.0);
-    float fill = max(dot(n, normalize(vec3(-0.75, -0.25, 0.45))), 0.0);
+    // The key has to be close to frontal. Angled at 45° it landed on the front
+    // faces and the extruded side walls at almost the same intensity, which is
+    // what flattened the whole monogram into a silhouette. Frontal gives the
+    // faces roughly 4x the side walls, so the extrusion actually reads.
+    float key  = max(dot(n, normalize(vec3(0.28, 0.5, 0.92))), 0.0);
+    float fill = max(dot(n, normalize(vec3(-0.85, -0.15, 0.25))), 0.0);
     // Tight exponent on purpose: at 2.4 the whole extruded side wall sat
     // inside the falloff and the letters went muddy red. This keeps the warm
     // accent as an edge, which is all it was ever meant to be.
     float fres = pow(1.0 - max(dot(n, normalize(vView)), 0.0), 4.0);
 
-    vec3 col = vec3(0.045)
-      + vec3(0.68, 0.69, 0.76) * key * 0.66
-      + uColorA * fill * 0.18
-      + uColorB * fres * 0.32;
+    vec3 col = vec3(0.035)
+      + vec3(0.80, 0.81, 0.87) * key * 0.85
+      + uColorA * fill * 0.22
+      + uColorB * fres * 0.30;
 
     gl_FragColor = vec4(col, uOpacity);
   }

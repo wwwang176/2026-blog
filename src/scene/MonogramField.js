@@ -99,8 +99,12 @@ export default class MonogramField {
 
   _initScene() {
     this.scene = new Scene();
-    this.camera = new PerspectiveCamera(45, 1, 0.1, 100);
-    this.camera.position.set(0, 0, 16);
+    // A longer lens than the particle field used. At 45° a wordmark this wide
+    // splays badly — the far letter ends up visibly smaller than the near one.
+    // Pulling back and narrowing keeps the framing identical and the letters
+    // close to parallel.
+    this.camera = new PerspectiveCamera(32, 1, 0.1, 120);
+    this.camera.position.set(0, 0, 23);
 
     this.colorA = new Color("#6f7ae0");
     this.colorB = new Color("#ff6a34");
@@ -250,7 +254,7 @@ export default class MonogramField {
     const aspect = w / h;
 
     this.camera.aspect = aspect;
-    this.camera.position.z = aspect < 1 ? 16 + (1 - aspect) * 10 : 16;
+    this.camera.position.z = aspect < 1 ? 23 + (1 - aspect) * 14 : 23;
     this.camera.updateProjectionMatrix();
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);

@@ -104,7 +104,7 @@ function shapeFromPoints(points, offsetX) {
  * `C` — an open annulus. The gap faces right and the terminals are cut on the
  * radius, which is what gives Space Grotesk's C its geometric, mechanical feel.
  */
-function buildC(offsetX, { outer = 1, stroke = 0.32 } = {}) {
+function buildC(offsetX, { outer = 1, stroke = 0.46 } = {}) {
   const inner = outer - stroke;
   const from = (52 * Math.PI) / 180;
   const to = (308 * Math.PI) / 180;
@@ -124,13 +124,15 @@ function buildC(offsetX, { outer = 1, stroke = 0.32 } = {}) {
  * baseline so the clip can cut flat terminals and flat valleys, rather than
  * leaving them perpendicular to the diagonals.
  */
-function buildW(offsetX, { halfWidth = 0.16 } = {}) {
+function buildW(offsetX, { halfWidth = 0.23 } = {}) {
+  // Widened along with the stroke: at the old spacing a 0.46 stem left the
+  // two inner diagonals almost touching, and the counters closed up.
   const centre = [
-    { x: -0.86, y: 1.45 },
-    { x: -0.45, y: -1.3 },
-    { x: 0, y: 0.52 },
-    { x: 0.45, y: -1.3 },
-    { x: 0.86, y: 1.45 },
+    { x: -1.02, y: 1.45 },
+    { x: -0.54, y: -1.3 },
+    { x: 0, y: 0.58 },
+    { x: 0.54, y: -1.3 },
+    { x: 1.02, y: 1.45 },
   ];
 
   let poly = strokeOutline(centre, halfWidth);
@@ -141,7 +143,7 @@ function buildW(offsetX, { halfWidth = 0.16 } = {}) {
 }
 
 /** `.` — sits on the baseline, faceted to match the rest. */
-function buildDot(offsetX, { radius = 0.17, segments = 12 } = {}) {
+function buildDot(offsetX, { radius = 0.23, segments = 12 } = {}) {
   const cy = BASE + radius;
   const points = [];
 
@@ -162,18 +164,23 @@ function buildDot(offsetX, { radius = 0.17, segments = 12 } = {}) {
 export function buildMonogramGeometry({ quality = "high" } = {}) {
   const curveSegments = quality === "low" ? 6 : quality === "medium" ? 8 : 11;
 
+  // Tracking is tight on purpose. Heavier letters need less air between them,
+  // and the period sits closer to the W than the letters sit to each other.
   const shapes = [
-    buildC(-1.95),
-    buildW(0.5),
-    buildDot(1.95),
+    buildC(-2.3),
+    buildW(0.35),
+    buildDot(2.02),
   ];
 
   const geometry = new ExtrudeGeometry(shapes, {
-    depth: 0.44,
+    // Depth stays under the stroke width. Extruding deeper than the stem is
+    // wide is what made the letters read as ribbons stood on edge — you saw
+    // more side wall than face.
+    depth: 0.34,
     curveSegments,
     bevelEnabled: true,
-    bevelThickness: 0.07,
-    bevelSize: 0.055,
+    bevelThickness: 0.05,
+    bevelSize: 0.042,
     bevelOffset: 0,
     bevelSegments: 1,
   });
