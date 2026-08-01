@@ -158,7 +158,7 @@ export const emberVertex = /* glsl */ `
 
   void main() {
     // Each ember runs its own slow loop, well out of step with its neighbours.
-    float rate = 0.28 + hash11(aSeed) * 0.4;
+    float rate = 0.19 + hash11(aSeed) * 0.27;
     float life = fract(aSeed * 0.613 + uTime * rate);
 
     vec3 p = aAnchor;
