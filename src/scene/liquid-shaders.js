@@ -109,7 +109,12 @@ export const liquidVertex = /* glsl */ `
  * compile time — so the source is built once the placement is known rather
  * than being a constant in this file.
  */
+/** Droplets per culling group. Divides the array; the caller pads to fit. */
+export const GROUP_SIZE = 5;
+
 export function buildLiquidFragment(count) {
+  const groups = count / GROUP_SIZE;
+
   return /* glsl */ `
   precision highp float;
 
@@ -126,6 +131,8 @@ export function buildLiquidFragment(count) {
   uniform float uBlend;
   uniform float uTint;
   uniform float uFeather;
+  uniform float uClamp;
+  uniform float uInvAniso;
   uniform int uSteps;
 
   uniform vec3 uBoxLo;
@@ -136,6 +143,9 @@ export function buildLiquidFragment(count) {
   uniform vec4 uDrops[${count}];
   // Reciprocal semi-axes, so the ellipsoid test multiplies instead of divides.
   uniform vec3 uInvRads[${count}];
+  // Bounding sphere per run of ${GROUP_SIZE} consecutive droplets. Consecutive
+  // means adjacent along the centreline, so these are tight.
+  uniform vec4 uGroups[${groups}];
 
   varying vec2 vUv;
 
@@ -155,15 +165,52 @@ export function buildLiquidFragment(count) {
    */
   float mapLiquid(vec3 p) {
     float d = 1e5;
-    for (int i = 0; i < ${count}; i++) {
-      vec4 drop = uDrops[i];
-      // Ellipsoid by the usual scaled-sphere approximation, brought back to
-      // world scale by the smallest semi-axis. It underestimates the true
-      // distance, which is why the trace steps at less than full length.
-      vec3 q = (p - drop.xyz) * uInvRads[i];
-      d = smin(d, (length(q) - 1.0) * drop.w, uBlend);
+    float nearest = 1e5;
+
+    for (int g = 0; g < ${groups}; g++) {
+      vec4 bound = uGroups[g];
+
+      // A droplet further away than the current best plus k cannot change a
+      // smin at that k, so a group whose nearest possible member is beyond
+      // that is skipped whole. Most of a ray's life is spent crossing empty
+      // space toward one part of the mark, and from out there every other part
+      // is far — this is where the ${count} evaluations per step go back down
+      // to a handful.
+      //
+      // uInvAniso widens the test to cover the ellipsoid estimate, which
+      // shrinks with the ratio of the smallest semi-axis to the largest and so
+      // can report less than the plain distance to the bounding sphere.
+      if (length(p - bound.xyz) - bound.w > (d + uBlend) * uInvAniso) continue;
+
+      for (int i = 0; i < ${GROUP_SIZE}; i++) {
+        int k = g * ${GROUP_SIZE} + i;
+        vec4 drop = uDrops[k];
+        // Ellipsoid by the usual scaled-sphere approximation, brought back to
+        // world scale by the smallest semi-axis. It underestimates the true
+        // distance, which is why the trace steps at less than full length.
+        vec3 q = (p - drop.xyz) * uInvRads[k];
+        float di = (length(q) - 1.0) * drop.w;
+
+        nearest = min(nearest, di);
+        d = smin(d, di, uBlend);
+      }
     }
-    return d;
+
+    // Chaining thirty smins compounds. Each one depresses its result by up to
+    // a quarter of k when its two inputs are within k of each other, and from
+    // any point far enough away every droplet is at much the same distance —
+    // so all thirty depress at once. At k = 0.195 that is over a unit of
+    // underestimate in the far field, and the trace crawls in through empty
+    // space taking steps that size. It is why raising the blend roughly halved
+    // the frame rate, which is not a cost the smoothing should carry.
+    //
+    // The surface of a smooth union never stands more than a fraction of k
+    // outside the nearest primitive, so clamping to that is both nearer the
+    // truth and very much faster. It has to stay an underestimate: overshoot
+    // here does not cost frames, it punches holes. A uniform so it can be
+    // taken off on the live instance and measured against, rather than
+    // believed.
+    return max(d, nearest - uBlend * uClamp);
   }
 
   /** Tetrahedral central differences: four evaluations rather than six. */

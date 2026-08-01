@@ -18,7 +18,7 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 
 import { buildDroplets } from "./monogram-centreline.js";
-import { buildLiquidFragment, liquidVertex } from "./liquid-shaders.js";
+import { GROUP_SIZE, buildLiquidFragment, liquidVertex } from "./liquid-shaders.js";
 
 /** Deterministic PRNG so the droplets ring identically on every load. */
 function makeRandom(seed = 20260801) {
@@ -72,17 +72,19 @@ export default class LiquidField {
     this.renderScale = quality === "low" ? 0.4 : quality === "medium" ? 0.55 : 0.7;
 
     // Cohesion at rest, and the one number that decides whether this reads as
-    // droplets or as a poured letterform. At 0.19 the beading is gone entirely
-    // and it costs frames as well, because a wider blend makes the distance
-    // estimate more conservative and the trace takes more steps to converge.
-    this.blend = 0.13;
+    // droplets or as a poured letterform. It is not free: a wider blend makes
+    // the distance estimate more conservative, so the trace takes more steps
+    // to converge.
+    this.blend = 0.195;
 
     // How far each radius swings either side of rest. Too little and the
     // droplets look solid; past about 0.25 neighbours pull apart at the
-    // troughs and the strokes break.
-    this.wobble = 0.15;
-    this.drift = 0.055;
-    this.radiusScale = 1;
+    // troughs and the strokes break — which the wide blend above now covers
+    // for, so this sits higher than it could otherwise.
+    this.wobble = 0.18;
+    this.drift = 0.07;
+    this.radiusScale = 1.07;
+    this.cull = true;
 
     this.heroOffset = new Vector2(0, 0);
 
@@ -121,8 +123,16 @@ export default class LiquidField {
     );
 
     const { count, centres, radius } = buildDroplets();
-    this.dropletCount = count;
-    this.rest = centres;
+
+    // The shader culls by whole groups, so the array is padded out to a round
+    // number of them. Padding sits far away with a negligible radius, which
+    // keeps it out of every min without needing a count test in the loop.
+    this.groupCount = Math.ceil(count / GROUP_SIZE);
+    this.dropletCount = this.groupCount * GROUP_SIZE;
+
+    this.rest = centres.slice();
+    while (this.rest.length < this.dropletCount) this.rest.push([1e3, 0]);
+
     this.restRadius = radius;
 
     const rand = makeRandom();
@@ -141,24 +151,36 @@ export default class LiquidField {
      * from the centre of the mark, with some depth mixed in so they do not all
      * separate within one plane.
      */
-    this.seeds = centres.map(([x, y]) => {
+    this.seeds = this.rest.map(([x, y], i) => {
       const f1 = rand();
       const f2 = rand();
       const f3 = rand();
       const z = (rand() - 0.5) * 1.6;
       const len = Math.hypot(x, y, z) || 1;
 
+      // Padding is parked far off with a radius that rounds to nothing.
+      if (i >= count) {
+        return { rate: 0, phase: 0, driftRate: [0, 0, 0], driftPhase: [0, 0, 0],
+                 escape: [0, 0, 0], radius: 1e-4 };
+      }
+
+      // Both rates run at twice what the shape was tuned at. Slower read as
+      // something suspended in gel; this is closer to how a droplet of that
+      // size actually rings, and it costs nothing since none of it is on the
+      // GPU any more.
       return {
-        rate: 1.1 + f1 * 1.5,
+        rate: 2.2 + f1 * 3.0,
         phase: f2 * Math.PI * 2,
-        driftRate: [0.53 + f1 * 0.6, 0.47 + f2 * 0.7, 0.61 + f3 * 0.5],
+        driftRate: [1.06 + f1 * 1.2, 0.94 + f2 * 1.4, 1.22 + f3 * 1.0],
         driftPhase: [f3, f1, f2].map((v) => v * Math.PI * 2),
         escape: [x / len, y / len, z / len],
+        radius,
       };
     });
 
-    const drops = centres.map(([x, y]) => new Vector4(x, y, 0, radius));
-    const invRads = centres.map(() => new Vector3(1 / radius, 1 / radius, 1 / radius));
+    const drops = this.rest.map(([x, y]) => new Vector4(x, y, 0, radius));
+    const invRads = this.rest.map(() => new Vector3(1 / radius, 1 / radius, 1 / radius));
+    const groups = Array.from({ length: this.groupCount }, () => new Vector4());
 
     this.material = new ShaderMaterial({
       vertexShader: liquidVertex,
@@ -174,15 +196,21 @@ export default class LiquidField {
         uRot: { value: new Vector2(0, 0) },
         uOpacity: { value: 1 },
         uBlend: { value: this.blend },
-        uTint: { value: 0.55 },
+        uTint: { value: 0.5 },
         // Set from the backing-store height in resize(), because it is an
         // angle and one pixel is what it has to match.
         uFeather: { value: 0.001 },
+        // How far the smin result may be clamped back toward the plain min,
+        // as a fraction of the blend. Zero disables the clamp entirely, which
+        // is how it gets measured against.
+        uClamp: { value: 0.75 },
+        uInvAniso: { value: 1 },
         uSteps: { value: this.steps },
         uBoxLo: { value: new Vector3() },
         uBoxHi: { value: new Vector3() },
         uDrops: { value: drops },
         uInvRads: { value: invRads },
+        uGroups: { value: groups },
       },
     });
 
@@ -201,12 +229,13 @@ export default class LiquidField {
 
     this.bloomScale = 0.5;
 
-    // Weaker than the fire's. There the whole subject was emissive and bloom
-    // was part of how it read; here only the specular highlights are above
-    // threshold, and that is all it should be catching.
+    // The threshold stays high, so this still only catches the specular hits
+    // and the Fresnel edge rather than lifting the whole body. Within that,
+    // it is turned up hard: on a subject this dark the bloom around a
+    // highlight is most of what reads as light passing through water.
     this.bloom = new UnrealBloomPass(
       new Vector2(window.innerWidth * this.bloomScale, window.innerHeight * this.bloomScale),
-      quality === "low" ? 0.14 : 0.2,
+      quality === "low" ? 0.42 : 0.6,
       0.5,
       0.9
     );
@@ -229,7 +258,6 @@ export default class LiquidField {
     const drops = u.uDrops.value;
     const invRads = u.uInvRads.value;
 
-    const r0 = this.restRadius * this.radiusScale;
     const loose = this.spread;
 
     let minX = Infinity, minY = Infinity, minZ = Infinity;
@@ -238,6 +266,7 @@ export default class LiquidField {
     for (let i = 0; i < this.dropletCount; i++) {
       const s = this.seeds[i];
       const rest = this.rest[i];
+      const r0 = s.radius * this.radiusScale;
 
       // Three sines a third of a cycle apart sum to zero, so the shape changes
       // while the volume very nearly does not.
@@ -279,6 +308,47 @@ export default class LiquidField {
     const pad = this.material.uniforms.uBlend.value + 0.02;
     u.uBoxLo.value.set(minX - pad, minY - pad, minZ - pad);
     u.uBoxHi.value.set(maxX + pad, maxY + pad, maxZ + pad);
+
+    // A bounding sphere over each run of consecutive droplets, which the
+    // shader uses to skip whole runs. Consecutive along the array is
+    // consecutive along the centreline, so a run is a short piece of one
+    // stroke and its sphere is tight.
+    const bounds = u.uGroups.value;
+
+    for (let g = 0; g < this.groupCount; g++) {
+      const from = g * GROUP_SIZE;
+      let cx = 0, cy = 0, cz = 0;
+
+      for (let i = from; i < from + GROUP_SIZE; i++) {
+        cx += drops[i].x;
+        cy += drops[i].y;
+        cz += drops[i].z;
+      }
+      cx /= GROUP_SIZE;
+      cy /= GROUP_SIZE;
+      cz /= GROUP_SIZE;
+
+      let r = 0;
+      for (let i = from; i < from + GROUP_SIZE; i++) {
+        const inv = invRads[i];
+        // Largest semi-axis, which is the reciprocal of the smallest inverse.
+        const widest = 1 / Math.min(inv.x, Math.min(inv.y, inv.z));
+        const reach =
+          Math.hypot(drops[i].x - cx, drops[i].y - cy, drops[i].z - cz) + widest;
+        if (reach > r) r = reach;
+      }
+
+      // A radius large enough that no group is ever skipped turns the culling
+      // off without a rebuild, which is the only way to A/B it inside one page
+      // session — and comparing across reloads is how every misleading
+      // measurement in this project has happened.
+      bounds[g].set(cx, cy, cz, this.cull ? r : 1e5);
+    }
+
+    // The ellipsoid estimate scales with the ratio of smallest semi-axis to
+    // largest, so a bound built from plain distances has to be widened by it
+    // or the shader will skip a group it should have evaluated.
+    u.uInvAniso.value = (1 + this.wobble) / Math.max(1 - this.wobble, 0.05);
   }
 
   /** Scroll-driven state, 0 → 3. */
