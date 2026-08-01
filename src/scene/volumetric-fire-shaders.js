@@ -165,9 +165,17 @@ export const emberVertex = /* glsl */ `
     // Buoyancy, accelerating — hot air does not lift at a constant rate.
     p.y += life * life * (5.2 + hash11(aSeed + 4.4) * 6.8);
 
-    // Embers wander. Straight lines read as rain going the wrong way.
-    p.x += sin(uTime * 1.5 + aSeed * 7.0) * life * 1.6;
-    p.z += cos(uTime * 1.2 + aSeed * 5.0) * life * 1.2;
+    // Each ember keeps a heading of its own for the whole of its life, at its
+    // own distance. Oscillating around the anchor made them sway in place and
+    // stay in a slab; a held direction sends them off front, back and to both
+    // sides, and the squared term lets them run wider as they climb.
+    float angle = hash11(aSeed + 12.9) * 6.2831853;
+    float reach = 0.5 + hash11(aSeed + 31.7) * 3.1;
+    p.xz += vec2(cos(angle), sin(angle)) * reach * life * life;
+
+    // A wobble on top, so the path is not a straight radial line.
+    p.x += sin(uTime * 1.5 + aSeed * 7.0) * life * 0.65;
+    p.z += cos(uTime * 1.2 + aSeed * 5.0) * life * 0.55;
 
     p.y += uDisperse * uDisperse * 5.0;
 
