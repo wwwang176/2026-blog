@@ -189,32 +189,6 @@ export function buildMonogramGeometry({ quality = "high" } = {}) {
 }
 
 /**
- * Per-triangle centroid, repeated across all three of its vertices.
- *
- * The mesh shader collapses each face toward this point, so the solid opens
- * along its own facet seams and hands over to the wireframe instead of just
- * cross-fading with it.
- */
-export function computeCentroids(geometry) {
-  const pos = geometry.getAttribute("position").array;
-  const out = new Float32Array(pos.length);
-
-  for (let i = 0; i < pos.length; i += 9) {
-    const cx = (pos[i] + pos[i + 3] + pos[i + 6]) / 3;
-    const cy = (pos[i + 1] + pos[i + 4] + pos[i + 7]) / 3;
-    const cz = (pos[i + 2] + pos[i + 5] + pos[i + 8]) / 3;
-
-    for (let v = 0; v < 3; v++) {
-      out[i + v * 3] = cx;
-      out[i + v * 3 + 1] = cy;
-      out[i + v * 3 + 2] = cz;
-    }
-  }
-
-  return out;
-}
-
-/**
  * Area-weighted surface sampling.
  *
  * Rolled by hand rather than pulled from `three/examples/jsm` for two reasons:

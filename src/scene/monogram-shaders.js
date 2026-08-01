@@ -1,39 +1,24 @@
 /**
  * Shaders for the three states the monogram passes through.
  *
- * All three are driven from one scroll value. The handover points matter more
- * than the states themselves: the solid opens along its own facets, the
- * wireframe is the seam that opening reveals, and the particles begin life on
- * the solid's surface — so nothing ever cross-fades into something that was
- * not already there.
+ * The states hand over by plain cross-fade. An earlier version had the solid
+ * burst apart into its own facets on the way out; it was busy and it fought
+ * the wireframe underneath, so the geometry now holds still and only opacity
+ * moves. The particles still begin life on the solid's surface, so the
+ * cross-fade lands on something already in the right place.
  */
 
 /* ── Solid ─────────────────────────────────────────────────────── */
 
 export const meshVertex = /* glsl */ `
-  attribute vec3 aCentroid;
-
-  uniform float uShrink;
-  uniform float uTime;
-
   varying vec3 vNormal;
   varying vec3 vView;
-  varying float vShrink;
 
   void main() {
-    // Each face retreats toward its own centroid and drifts out along its
-    // normal, so the solid comes apart into the facets it was built from.
-    vec3 p = mix(position, aCentroid, uShrink * 0.85);
-    p += normal * uShrink * 0.18;
-
-    // A breath of movement while the hero is still.
-    p += normal * sin(uTime * 0.5 + aCentroid.x * 2.0) * 0.012;
-
-    vec4 mv = modelViewMatrix * vec4(p, 1.0);
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
 
     vNormal = normalize(normalMatrix * normal);
     vView = normalize(-mv.xyz);
-    vShrink = uShrink;
 
     gl_Position = projectionMatrix * mv;
   }
@@ -48,26 +33,24 @@ export const meshFragment = /* glsl */ `
 
   varying vec3 vNormal;
   varying vec3 vView;
-  varying float vShrink;
 
   void main() {
     vec3 n = normalize(vNormal);
 
     // Two hard-coded lights rather than real ones: the look is fully art
-    // directed and the scene stays free of lighting setup.
+    // directed and the scene stays free of lighting setup. The key is kept
+    // near-neutral — tinting key and rim both read as bruised purple.
     float key  = max(dot(n, normalize(vec3(0.55, 0.85, 0.5))), 0.0);
     float fill = max(dot(n, normalize(vec3(-0.75, -0.25, 0.45))), 0.0);
-    float fres = pow(1.0 - max(dot(n, normalize(vView)), 0.0), 2.4);
+    // Tight exponent on purpose: at 2.4 the whole extruded side wall sat
+    // inside the falloff and the letters went muddy red. This keeps the warm
+    // accent as an edge, which is all it was ever meant to be.
+    float fres = pow(1.0 - max(dot(n, normalize(vView)), 0.0), 4.0);
 
-    // The key stays near-neutral. Tinting it as well as the rim was what made
-    // the solid read as bruised purple instead of dark metal.
-    vec3 col = vec3(0.035)
-      + vec3(0.62, 0.63, 0.70) * key * 0.55
-      + uColorA * fill * 0.16
-      + uColorB * fres * 0.5;
-
-    // Faces brighten as they part, so the break-up reads as light getting in.
-    col += uColorB * vShrink * 0.28;
+    vec3 col = vec3(0.045)
+      + vec3(0.68, 0.69, 0.76) * key * 0.66
+      + uColorA * fill * 0.18
+      + uColorB * fres * 0.32;
 
     gl_FragColor = vec4(col, uOpacity);
   }
@@ -76,17 +59,7 @@ export const meshFragment = /* glsl */ `
 /* ── Wireframe ─────────────────────────────────────────────────── */
 
 export const lineVertex = /* glsl */ `
-  attribute float aSeed;
-
-  uniform float uReveal;
-
-  varying float vFade;
-
   void main() {
-    // Staggering by seed means the cage assembles edge by edge instead of
-    // arriving all at once.
-    vFade = smoothstep(aSeed * 0.55, aSeed * 0.55 + 0.45, uReveal);
-
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
@@ -97,10 +70,8 @@ export const lineFragment = /* glsl */ `
   uniform vec3 uColor;
   uniform float uOpacity;
 
-  varying float vFade;
-
   void main() {
-    gl_FragColor = vec4(uColor, uOpacity * vFade);
+    gl_FragColor = vec4(uColor, uOpacity);
   }
 `;
 
@@ -116,26 +87,25 @@ export const pointVertex = /* glsl */ `
   uniform float uTime;
   uniform float uSize;
   uniform float uPixelRatio;
-  uniform vec2 uPointer;
+  uniform float uModelScale;
 
   varying float vDepth;
   varying float vSeed;
 
   void main() {
-    // Eased so points leave the surface reluctantly and settle gently.
+    // aFrom is a sample taken on the unscaled solid, so it has to pick up the
+    // same scale the solid is drawn at or the cloud lands the wrong size —
+    // the lattice it flies to is already in world units and must not scale.
+    vec3 from = aFrom * uModelScale;
+
     float t = smoothstep(0.0, 1.0, uMorph);
-    vec3 p = mix(aFrom, aTo, t);
+    vec3 p = mix(from, aTo, t);
 
-    // Points bow outward mid-flight rather than sliding along a straight line.
-    float arc = sin(t * 3.14159);
-    p += normalize(aFrom + vec3(0.001)) * arc * (1.2 + aSeed * 0.02);
-
-    // Idle drift, strongest once the points have scattered.
-    float drift = 0.14 + t * 0.4;
+    // Drift has to start at exactly zero, otherwise the cloud is already
+    // jittering off the surface at the moment it is meant to match it.
+    float drift = t * 0.45;
     p.x += sin(uTime * 0.32 + aSeed) * drift;
     p.y += cos(uTime * 0.27 + aSeed * 1.7) * drift;
-
-    p.xy += uPointer * 0.35;
 
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
     vDepth = -mv.z;
@@ -165,7 +135,7 @@ export const pointFragment = /* glsl */ `
     vec3 col = mix(uColorA, uColorB, fract(vSeed * 0.37));
 
     // Fade with distance so the cloud keeps depth instead of reading flat.
-    float depthFade = smoothstep(30.0, 8.0, vDepth);
+    float depthFade = smoothstep(34.0, 8.0, vDepth);
 
     gl_FragColor = vec4(col, alpha * uOpacity * depthFade);
   }

@@ -4,6 +4,7 @@ import {
   BufferGeometry,
   Color,
   DoubleSide,
+  Group,
   LineSegments,
   Mesh,
   PerspectiveCamera,
@@ -17,7 +18,6 @@ import {
 
 import {
   buildMonogramGeometry,
-  computeCentroids,
   sampleSurface,
 } from "./monogram-geometry.js";
 
@@ -43,21 +43,19 @@ function makeRandom(seed = 20260801) {
 const range = (v, a, b) => Math.min(Math.max((v - a) / (b - a), 0), 1);
 
 /**
- * Scroll windows. Each state hands over before the next is fully present, so
- * there is always an overlap and never a cut.
+ * Cross-fade windows. Each pair overlaps exactly, so one state is arriving at
+ * the same rate the previous one leaves and the total never dips.
  *
- *   0 ──── solid ────┐
- *              0.75 ─┴─ opening ──┐
- *                          0.80 ──┴── wireframe ──┐
- *                                          1.75 ──┴── particles ──▶ 3
+ *   0 ─── solid ───┐
+ *            0.80 ─┴─ 1.30 ─── wireframe ───┐
+ *                                    1.80 ──┴── 2.30 ─── particles ──▶ 3
  */
 const STAGE = {
-  shrink: [0.75, 1.5],
-  meshOut: [0.9, 1.55],
-  lineIn: [0.8, 1.5],
-  lineOut: [1.7, 2.25],
-  pointIn: [1.75, 2.3],
-  morph: [2.2, 3],
+  meshOut: [0.8, 1.3],
+  lineIn: [0.8, 1.3],
+  lineOut: [1.8, 2.3],
+  pointIn: [1.8, 2.3],
+  morph: [2.35, 3],
 };
 
 /**
@@ -74,9 +72,10 @@ export default class MonogramField {
     this.spin = 0;
     this.progress = 0;
     this.baseOpacity = 1;
+    this.modelScale = 1;
     this.disposed = false;
 
-    this.count = quality === "low" ? 6000 : quality === "medium" ? 12000 : 20000;
+    this.count = quality === "low" ? 7000 : quality === "medium" ? 14000 : 24000;
 
     // Where the monogram rests during the hero. Zero it when the monogram is
     // the hero subject rather than a companion to a headline.
@@ -105,6 +104,15 @@ export default class MonogramField {
 
     this.colorA = new Color("#6f7ae0");
     this.colorB = new Color("#ff6a34");
+
+    // Solid and wireframe share one transform, so they can never drift apart.
+    this.solidRoot = new Group();
+    // The cloud takes the same rotation and position but never the scale: its
+    // start positions are scaled in the shader instead, leaving the lattice it
+    // flies out to in plain world units.
+    this.cloudRoot = new Group();
+
+    this.scene.add(this.solidRoot, this.cloudRoot);
   }
 
   _build(quality) {
@@ -112,17 +120,13 @@ export default class MonogramField {
 
     // ── Solid ────────────────────────────────────────────
     const geometry = buildMonogramGeometry({ quality });
-    geometry.setAttribute("aCentroid", new BufferAttribute(computeCentroids(geometry), 3));
 
     this.meshMaterial = new ShaderMaterial({
       vertexShader: meshVertex,
       fragmentShader: meshFragment,
       transparent: true,
-      // Faces rotate away from the camera as they part, so both sides show.
       side: DoubleSide,
       uniforms: {
-        uShrink: { value: 0 },
-        uTime: { value: 0 },
         uOpacity: { value: 1 },
         uColorA: { value: this.colorA },
         uColorB: { value: this.colorB },
@@ -134,17 +138,6 @@ export default class MonogramField {
 
     // ── Wireframe ────────────────────────────────────────
     const wire = new WireframeGeometry(geometry);
-    const segments = wire.getAttribute("position").count / 2;
-    const lineSeed = new Float32Array(segments * 2);
-
-    for (let s = 0; s < segments; s++) {
-      // Both ends of a segment share a seed, or it would fade in askew.
-      const value = rand();
-      lineSeed[s * 2] = value;
-      lineSeed[s * 2 + 1] = value;
-    }
-
-    wire.setAttribute("aSeed", new BufferAttribute(lineSeed, 1));
 
     this.lineMaterial = new ShaderMaterial({
       vertexShader: lineVertex,
@@ -152,7 +145,6 @@ export default class MonogramField {
       transparent: true,
       depthWrite: false,
       uniforms: {
-        uReveal: { value: 0 },
         uOpacity: { value: 0 },
         uColor: { value: new Color("#cfd2ff") },
       },
@@ -160,6 +152,8 @@ export default class MonogramField {
 
     this.lines = new LineSegments(wire, this.lineMaterial);
     this.lines.frustumCulled = false;
+
+    this.solidRoot.add(this.mesh, this.lines);
 
     // ── Particles ────────────────────────────────────────
     const { count } = this;
@@ -177,8 +171,8 @@ export default class MonogramField {
       const u = (i % cols) / (cols - 1) - 0.5;
       const v = Math.floor(i / cols) / (cols - 1) - 0.5;
 
-      to[i3] = u * 17;
-      to[i3 + 1] = -v * 10;
+      to[i3] = u * 18;
+      to[i3 + 1] = -v * 11;
       to[i3 + 2] = (rand() - 0.5) * 1.4;
 
       scale[i] = 0.35 + Math.pow(rand(), 2) * 0.9;
@@ -202,10 +196,10 @@ export default class MonogramField {
       uniforms: {
         uMorph: { value: 0 },
         uTime: { value: 0 },
-        uSize: { value: 46 },
+        uSize: { value: 42 },
         uPixelRatio: { value: 1 },
+        uModelScale: { value: 1 },
         uOpacity: { value: 0 },
-        uPointer: { value: new Vector2(0, 0) },
         uColorA: { value: this.colorA },
         uColorB: { value: this.colorB },
       },
@@ -213,32 +207,25 @@ export default class MonogramField {
 
     this.points = new Points(cloud, this.pointMaterial);
     this.points.frustumCulled = false;
+    this.cloudRoot.add(this.points);
 
     this.cloudGeometry = cloud;
     this.wireGeometry = wire;
     this.geometry = geometry;
-
-    this.group = [this.mesh, this.lines, this.points];
-    this.group.forEach((o) => this.scene.add(o));
   }
 
   /** Scroll-driven state, 0 → 3. */
   setProgress(value) {
     this.progress = value;
 
-    const shrink = range(value, ...STAGE.shrink);
     const meshFade = 1 - range(value, ...STAGE.meshOut);
     const lineFade = range(value, ...STAGE.lineIn) * (1 - range(value, ...STAGE.lineOut));
     const pointFade = range(value, ...STAGE.pointIn);
 
-    this.meshMaterial.uniforms.uShrink.value = shrink;
     this.meshMaterial.uniforms.uOpacity.value = meshFade * this.baseOpacity;
-
-    this.lineMaterial.uniforms.uReveal.value = range(value, ...STAGE.lineIn);
     this.lineMaterial.uniforms.uOpacity.value = lineFade * this.baseOpacity;
-
-    this.pointMaterial.uniforms.uMorph.value = range(value, ...STAGE.morph);
     this.pointMaterial.uniforms.uOpacity.value = pointFade * this.baseOpacity;
+    this.pointMaterial.uniforms.uMorph.value = range(value, ...STAGE.morph);
 
     // Skip the draw call entirely once a state is gone.
     this.mesh.visible = meshFade > 0.001;
@@ -271,30 +258,28 @@ export default class MonogramField {
     this.renderer.setSize(w, h, false);
     this.pointMaterial.uniforms.uPixelRatio.value = dpr;
 
-    // Narrow viewports get a smaller monogram so it never crowds the headline.
-    const scale = aspect < 1 ? 1.15 : 1.45;
-    this.mesh.scale.setScalar(scale);
-    this.lines.scale.setScalar(scale);
+    // Narrow viewports get a smaller monogram so it never crowds the caption.
+    this.modelScale = aspect < 1 ? 1.9 : 2.6;
+    this.solidRoot.scale.setScalar(this.modelScale);
+    this.pointMaterial.uniforms.uModelScale.value = this.modelScale;
   }
 
   tick(dt) {
     if (this.disposed) return;
 
     this.time += dt;
-    this.meshMaterial.uniforms.uTime.value = this.time;
     this.pointMaterial.uniforms.uTime.value = this.time;
 
     this.pointer.lerp(this.pointerTarget, 0.045);
-    this.pointMaterial.uniforms.uPointer.value.copy(this.pointer);
 
     // The monogram has to stay readable in the hero, so it only rocks with the
-    // cursor there. Rotation is earned once it starts coming apart — by then
-    // it is a shape, not a word, and spinning it costs nothing.
+    // cursor there. Rotation is earned once it starts breaking up — by then it
+    // is a shape, not a word, and turning it costs nothing.
     const freed = range(this.progress, 0.7, 1.6);
-    this.spin += dt * 0.22 * freed;
+    this.spin += dt * 0.18 * freed;
 
-    const rotY = this.spin + this.pointer.x * 0.25;
-    const rotX = this.pointer.y * -0.18 + freed * 0.12;
+    const rotY = this.spin + this.pointer.x * 0.22;
+    const rotX = this.pointer.y * -0.16 + freed * 0.1;
 
     // In the hero it sits up and to the right, clear of the headline — unless
     // the monogram *is* the hero, in which case the caller zeroes the offset.
@@ -302,11 +287,14 @@ export default class MonogramField {
     const px = this.heroOffset.x * heroBias;
     const py = this.heroOffset.y * heroBias;
 
-    for (const object of this.group) {
-      object.rotation.y = rotY;
-      object.rotation.x = rotX;
-      object.position.set(px, py, 0);
-    }
+    this.solidRoot.rotation.set(rotX, rotY, 0);
+    this.solidRoot.position.set(px, py, 0);
+
+    // The cloud unwinds back to square as it settles: a lattice held at an
+    // angle just reads as a skewed grid.
+    const settle = 1 - this.pointMaterial.uniforms.uMorph.value;
+    this.cloudRoot.rotation.set(rotX * settle, rotY * settle, 0);
+    this.cloudRoot.position.set(px * settle, py * settle, 0);
 
     this.renderer.render(this.scene, this.camera);
   }
