@@ -183,8 +183,10 @@ function attachSceneListeners() {
  * down the page. What the sequence is about is what the mark is made of.
  * Raise these two numbers to give the letting-go back.
  *
- * The last runs the whole way, because the page ends there and something has
- * to happen at an ending.
+ * The last runs three quarters of the way. Something has to happen at an
+ * ending, but the whole way took the mark with it — the bottom of the page
+ * had nothing left on it. Three quarters is well into the scouring and short
+ * of the fade, so the mark arrives at the ending worn rather than gone.
  */
 const HOME_BANDS = [
   // Hero and brief. Works. Journal and contact. The boundaries were picked
@@ -193,7 +195,7 @@ const HOME_BANDS = [
   // not quite half, because the sections are nowhere near the same height.
   { name: "fire", from: 0, to: 1.5, arc: [0, 1.2] },
   { name: "liquid", from: 1.5, to: 2.25, arc: [0, 1.2] },
-  { name: "granular", from: 2.25, to: 3, arc: [0, 3] },
+  { name: "granular", from: 2.25, to: 3, arc: [0, 2.25] },
 ];
 
 const bandAt = (p) => HOME_BANDS.find((b) => p < b.to) ?? HOME_BANDS[HOME_BANDS.length - 1];
