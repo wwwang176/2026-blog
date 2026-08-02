@@ -172,25 +172,27 @@ function attachSceneListeners() {
  * `from`/`to` are positions in the page's own 0 → 3 scroll, and `arc` is the
  * stretch of that scene's own 0 → 3 the band is played across.
  *
- * The first two arcs stop at 1.9. Running them further looked right written
- * down — a whole life inside each band — and was wrong on the screen: with a
- * third of a page each, every element spent most of its band coming apart and
- * the mark was only briefly legible in any of them. What the sequence is about
- * is the mark changing what it is made of, not being destroyed three times.
- * So each of the first two holds together through its band and is just
- * beginning to let go as it hands over, which is what gives the crossing
- * somewhere to start. The last runs the whole way, because the page ends
- * there and something has to.
+ * The first two arcs stop at 1.2, which holds those scenes completely still.
+ * 1.2 is the lowest threshold either of them reacts to — the drift starts
+ * there, the dispersal at 1.4, the fade at 2.4 — so at or under it the flame
+ * does not lift, the droplets do not separate, and neither turns. Letting
+ * them run further was two successive mistakes: first a whole life inside
+ * each band, which read as the mark being destroyed three times rather than
+ * changing what it is made of; then just enough to be visibly letting go,
+ * which still had the plume climbing and the water coming apart on the way
+ * down the page. What the sequence is about is what the mark is made of.
+ * Raise these two numbers to give the letting-go back.
  *
- * These numbers are the whole tuning surface for the sequence.
+ * The last runs the whole way, because the page ends there and something has
+ * to happen at an ending.
  */
 const HOME_BANDS = [
   // Hero and brief. Works. Journal and contact. The boundaries were picked
   // against measured scroll positions rather than by dividing the axis, which
   // is nothing like even: stage 1 lands at a sixth of the page and stage 2 at
   // not quite half, because the sections are nowhere near the same height.
-  { name: "fire", from: 0, to: 1.5, arc: [0, 1.9] },
-  { name: "liquid", from: 1.5, to: 2.25, arc: [0, 1.9] },
+  { name: "fire", from: 0, to: 1.5, arc: [0, 1.2] },
+  { name: "liquid", from: 1.5, to: 2.25, arc: [0, 1.2] },
   { name: "granular", from: 2.25, to: 3, arc: [0, 3] },
 ];
 
