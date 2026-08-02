@@ -88,7 +88,14 @@ export default class LiquidField {
     // renders the same count, and at 635e3 it lands around 93. Backed off to
     // where both hold above a hundred. The lab exposes this in megapixels, so
     // it can be dialled at whatever resolution it is actually being watched.
-    this.pixelBudget = quality === "low" ? 280e3 : quality === "medium" ? 400e3 : 540e3;
+    //
+    // Then down again by a fifth when the mark was sized to the frame. A
+    // sphere trace pays per pixel that meets the surface, and at half again
+    // the scale the mark covers a bit over twice the area — the water was the
+    // only one of the three that fell under the display's ceiling for it. All
+    // three tiers moved by the same fraction, so the ladder still means
+    // something.
+    this.pixelBudget = quality === "low" ? 223e3 : quality === "medium" ? 318e3 : 430e3;
 
     // Derived in resize(). A surface has a silhouette and gives up resolution
     // far worse than the fire's volume did, so the ceiling is well above the

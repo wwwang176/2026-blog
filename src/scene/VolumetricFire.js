@@ -273,15 +273,17 @@ export default class VolumetricFire {
 
     this.material.uniforms.uAspect.value = aspect;
     this.material.uniforms.uCamZ.value = camZ;
-    // A smaller share of the frame than the other two ask for, because the
-    // density field grows well beyond the letterform it is shaped from — the
-    // plume is part of the footprint, and while its top is allowed off the
-    // frame the flame around the letters is not.
+    // The same share as the other two. It used to ask for less, on the
+    // grounds that the density field grows well beyond the letterform it is
+    // shaped from and the plume is part of the footprint. That is an argument
+    // about headroom, and it had been applied to the width as well, which left
+    // the mark visibly smaller here than in the other two scenes for no reason
+    // that shows on screen. The plume's top was already allowed off the frame;
+    // now more of it is.
     this.material.uniforms.uScale.value = fitScale(
       aspect,
       camZ,
-      this.material.uniforms.uTanHalfFov.value,
-      { fill: 0.71, cap: 0.53 }
+      this.material.uniforms.uTanHalfFov.value
     );
 
     const base = Math.min(window.devicePixelRatio || 1, 2);
