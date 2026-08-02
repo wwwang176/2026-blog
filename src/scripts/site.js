@@ -167,6 +167,82 @@ function attachSceneListeners() {
 /* ── Particle field ───────────────────────────────────────── */
 
 /**
+ * The landing page's three elements, and where they hand over.
+ *
+ * `from`/`to` are positions in the page's own 0 → 3 scroll, and `arc` is the
+ * stretch of that scene's own 0 → 3 the band is played across.
+ *
+ * The first two arcs stop at 1.9. Running them further looked right written
+ * down — a whole life inside each band — and was wrong on the screen: with a
+ * third of a page each, every element spent most of its band coming apart and
+ * the mark was only briefly legible in any of them. What the sequence is about
+ * is the mark changing what it is made of, not being destroyed three times.
+ * So each of the first two holds together through its band and is just
+ * beginning to let go as it hands over, which is what gives the crossing
+ * somewhere to start. The last runs the whole way, because the page ends
+ * there and something has to.
+ *
+ * These numbers are the whole tuning surface for the sequence.
+ */
+const HOME_BANDS = [
+  // Hero and brief. Works. Journal and contact. The boundaries were picked
+  // against measured scroll positions rather than by dividing the axis, which
+  // is nothing like even: stage 1 lands at a sixth of the page and stage 2 at
+  // not quite half, because the sections are nowhere near the same height.
+  { name: "fire", from: 0, to: 1.5, arc: [0, 1.9] },
+  { name: "liquid", from: 1.5, to: 2.25, arc: [0, 1.9] },
+  { name: "granular", from: 2.25, to: 3, arc: [0, 3] },
+];
+
+const bandAt = (p) => HOME_BANDS.find((b) => p < b.to) ?? HOME_BANDS[HOME_BANDS.length - 1];
+
+/** Where `p` sits inside `band`, expressed on that scene's own arc. */
+function arcAt(band, p) {
+  const t = Math.min(Math.max((p - band.from) / (band.to - band.from), 0), 1);
+  return band.arc[0] + t * (band.arc[1] - band.arc[0]);
+}
+
+/**
+ * Drives the sequence from the page's scroll position.
+ *
+ * Asking for a scene is asynchronous, so the one already on screen keeps
+ * taking the progress until its replacement arrives — clamped to the end of
+ * its own band, so it holds the last pose of its life rather than freezing
+ * wherever the scroll happened to be when the request went out.
+ */
+function driveHomeBands(field) {
+  let asked = HOME_BANDS[0];
+  let live = { field, band: asked };
+
+  return {
+    setProgress(p) {
+      const next = bandAt(p);
+
+      if (next !== asked) {
+        asked = next;
+        showScene(next.name).then((r) => {
+          if (r && asked === next) live = { field: r.field, band: next };
+        });
+      }
+
+      live.field.setProgress(arcAt(live.band, p));
+
+      // Build the one after this while there is still scrolling to do before
+      // it is wanted, so every handover is the two-hundred millisecond fade
+      // and nothing else.
+      const ahead = HOME_BANDS[HOME_BANDS.indexOf(next) + 1];
+      if (ahead && p > next.from + (next.to - next.from) * 0.35) {
+        startDirector().then((d) => d?.prebuild(ahead.name));
+      }
+    },
+
+    setOpacity(v) {
+      live.field.setOpacity(v);
+    },
+  };
+}
+
+/**
  * Pages declare what the field should do via `data-scene` on <main>:
  *   scroll  — sections drive uProgress (the landing page)
  *   static  — hold one stage, set by `data-scene-stage`
@@ -180,6 +256,10 @@ function bindScene(main, field, changed) {
     // trigger happened to fire.
     field.setOpacity(1);
 
+    // Standing in for a single scene: the landing page runs three of them in
+    // sequence, and the triggers below should not have to know that.
+    const scene = driveHomeBands(field);
+
     // `data-stage` is the progress value the field holds at that section's
     // centre, not just a sort key. It used to be the latter and the progress
     // came from the array index, which meant a section could only be inserted
@@ -190,20 +270,50 @@ function bindScene(main, field, changed) {
       .map((el) => ({ el, stage: Number(el.dataset.stage) }))
       .sort((a, b) => a.stage - b.stage);
 
-    sections.forEach(({ el, stage }, i) => {
-      const next = sections[i + 1];
-      if (!next) return;
+    // Scroll position of each section's centre, remeasured whenever the
+    // layout can have moved.
+    let stops = [];
 
-      const span = next.stage - stage;
-
-      ScrollTrigger.create({
-        trigger: el,
-        start: "center center",
-        endTrigger: next.el,
-        end: "center center",
-        scrub: true,
-        onUpdate: (self) => field.setProgress(stage + self.progress * span),
+    const measure = () => {
+      const max = ScrollTrigger.maxScroll(window);
+      const mid = window.innerHeight / 2;
+      stops = sections.map(({ el, stage }) => {
+        const box = el.getBoundingClientRect();
+        const y = box.top + window.scrollY + box.height / 2 - mid;
+        return { stage, y: Math.min(Math.max(y, 0), max) };
       });
+    };
+
+    /** The page's 0 → 3, piecewise between the section centres. */
+    const progressAt = (y) => {
+      if (!stops.length) return 0;
+      if (y <= stops[0].y) return stops[0].stage;
+
+      for (let i = 1; i < stops.length; i++) {
+        const a = stops[i - 1];
+        const b = stops[i];
+        if (y > b.y) continue;
+        const span = b.y - a.y;
+        return span > 0 ? a.stage + ((y - a.y) / span) * (b.stage - a.stage) : b.stage;
+      }
+      return stops[stops.length - 1].stage;
+    };
+
+    // One trigger for the whole page rather than one per pair of sections.
+    // Each of those fired its own onUpdate on every scroll event, including
+    // the ones already clamped at 0 or 1, so the progress arrived several
+    // times a frame carrying different values. With a single scene that was
+    // invisible — the right value overwrote the wrong ones in the same frame.
+    // With three it made the sequence pick a different element several times a
+    // frame, and every pick cancelled the crossing the last one had started,
+    // so nothing changed until the scrolling stopped.
+    ScrollTrigger.create({
+      trigger: main,
+      start: "top top",
+      end: "max",
+      scrub: true,
+      onRefresh: measure,
+      onUpdate: (self) => scene.setProgress(progressAt(self.scroll())),
     });
 
     const contact = document.getElementById("contact");
@@ -213,7 +323,7 @@ function bindScene(main, field, changed) {
         start: "top 70%",
         end: "top 20%",
         scrub: true,
-        onUpdate: (self) => field.setOpacity(1 - self.progress * 0.45),
+        onUpdate: (self) => scene.setOpacity(1 - self.progress * 0.45),
       });
     }
     return;

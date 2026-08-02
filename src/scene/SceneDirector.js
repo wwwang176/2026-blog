@@ -32,8 +32,11 @@ export default class SceneDirector {
     this.container = container;
     this.quality = quality;
 
-    /** name → { field, canvas, stale, warmed } */
+    /** name → { field, canvas, stale, warming } */
     this.built = new Map();
+
+    /** name → in-flight build, so nothing is constructed twice. */
+    this.building = new Map();
 
     this.active = null;
     this.activeName = null;
@@ -92,29 +95,52 @@ export default class SceneDirector {
     return { field: this.active, changed: false };
   }
 
-  async _build(name) {
+  /**
+   * Build and warm a scene without showing it.
+   *
+   * Worth doing from anywhere that can see a crossing coming: a scene met for
+   * the first time costs 360ms to reach and one already built costs 94, of
+   * which 200 is the fade itself — so a warm crossing is waiting on nothing.
+   */
+  async prebuild(name) {
+    if (!REGISTRY[name]) return;
+    const entry = await this._build(name);
+    if (entry) await this._warm(entry);
+  }
+
+  _build(name) {
     const existing = this.built.get(name);
-    if (existing) return existing;
+    if (existing) return Promise.resolve(existing);
 
-    const canvas = document.createElement("canvas");
-    canvas.style.display = "none";
-    this.container.appendChild(canvas);
+    // A crossing and a prebuild can both want the same scene, and building it
+    // twice would leave two contexts where one belongs.
+    const inflight = this.building.get(name);
+    if (inflight) return inflight;
 
-    try {
-      const { default: Field } = await REGISTRY[name]();
-      const entry = {
-        field: new Field(canvas, { quality: this.quality }),
-        canvas,
-        stale: false,
-        warmed: false,
-      };
-      this.built.set(name, entry);
-      return entry;
-    } catch (err) {
-      console.warn(`Scene "${name}" unavailable.`, err);
-      canvas.remove();
-      return null;
-    }
+    const started = (async () => {
+      const canvas = document.createElement("canvas");
+      canvas.style.display = "none";
+      this.container.appendChild(canvas);
+
+      try {
+        const { default: Field } = await REGISTRY[name]();
+        const entry = {
+          field: new Field(canvas, { quality: this.quality }),
+          canvas,
+          stale: false,
+          warming: null,
+        };
+        this.built.set(name, entry);
+        return entry;
+      } catch (err) {
+        console.warn(`Scene "${name}" unavailable.`, err);
+        canvas.remove();
+        return null;
+      }
+    })().finally(() => this.building.delete(name));
+
+    this.building.set(name, started);
+    return started;
   }
 
   /**
@@ -127,19 +153,22 @@ export default class SceneDirector {
    * before where it is not supported. The composer's own passes still compile
    * on the tick below, but a bloom kernel is nothing beside a volume march.
    */
-  async _warm(entry) {
-    if (entry.warmed) return;
-    entry.warmed = true;
-
-    const { field } = entry;
-
-    try {
-      await field.renderer.compileAsync(field.scene, field.camera);
-    } catch {
-      // Not fatal — the tick below will compile it the slow way instead.
+  _warm(entry) {
+    // The promise is the guard, not a flag. A flag set on entry would let a
+    // second caller through while the compile was still running, and a
+    // crossing would fade in on a scene that had never drawn.
+    if (!entry.warming) {
+      const { field } = entry;
+      entry.warming = (async () => {
+        try {
+          await field.renderer.compileAsync(field.scene, field.camera);
+        } catch {
+          // Not fatal — the tick below will compile it the slow way instead.
+        }
+        field.tick(0);
+      })();
     }
-
-    field.tick(0);
+    return entry.warming;
   }
 
   /**
