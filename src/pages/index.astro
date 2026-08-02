@@ -89,7 +89,13 @@ const posts = (await getCollection("journal", ({ data }) => !data.draft))
     </section>
 
     <!-- ── Journal ──────────────────────────────────────── -->
-    <section class="section section--journal" id="journal">
+    <!--
+      Fractional on purpose: the journal sits between works (2) and contact (3)
+      and would otherwise be crossed by one long unbroken ramp. Held back from
+      the 2.5 a linear ramp would give it, so the mark stays quiet through the
+      reading and does its collapsing on the way into contact.
+    -->
+    <section class="section section--journal" id="journal" data-stage="2.4">
       <p class="section__label mono" data-fade>(03) — Journal</p>
 
       <ul class="post-list" data-stagger>

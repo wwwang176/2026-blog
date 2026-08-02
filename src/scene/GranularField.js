@@ -68,6 +68,12 @@ export default class GranularField {
     this.baseOpacity = 1;
     this.disposed = false;
 
+    // Where the scene sits on pages that are not the scroll narrative. Below
+    // the 1.2 the scouring starts at, so a detail page gets the mark carved and
+    // standing in a light wind rather than one held permanently half worn away
+    // — the page's own stage number means a particle shape and nothing here.
+    this.restStage = 0.9;
+
     this.steps = quality === "low" ? 56 : quality === "medium" ? 80 : 110;
 
     // The same policy as the other two: a count rather than a fraction, so the

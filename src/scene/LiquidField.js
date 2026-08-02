@@ -59,6 +59,12 @@ export default class LiquidField {
     this.baseOpacity = 1;
     this.disposed = false;
 
+    // Where the scene sits on pages that are not the scroll narrative. Below
+    // the 1.4 the droplets start separating at, so a detail page gets the mark
+    // whole and wobbling rather than one caught mid-break — the page's own
+    // stage number means a particle shape and nothing here.
+    this.restStage = 0.9;
+
     // Sphere tracing converges, so unlike the fire's stride this cap is a real
     // limit rather than a formality — a ray that has not arrived by here is
     // grazing the surface, and stopping it early costs an edge pixel.

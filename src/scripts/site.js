@@ -151,21 +151,29 @@ function bindScene(main) {
   if (!field || !main) return;
 
   if (main.dataset.scene === "scroll") {
-    const sections = [...main.querySelectorAll("[data-stage]")].sort(
-      (a, b) => Number(a.dataset.stage) - Number(b.dataset.stage)
-    );
+    // `data-stage` is the progress value the field holds at that section's
+    // centre, not just a sort key. It used to be the latter and the progress
+    // came from the array index, which meant a section could only be inserted
+    // at the cost of renumbering every scene's stage constants — so the
+    // journal simply had no stage at all, and the works-to-contact ramp ran
+    // blind across two sections of scrolling.
+    const sections = [...main.querySelectorAll("[data-stage]")]
+      .map((el) => ({ el, stage: Number(el.dataset.stage) }))
+      .sort((a, b) => a.stage - b.stage);
 
-    sections.forEach((section, i) => {
+    sections.forEach(({ el, stage }, i) => {
       const next = sections[i + 1];
       if (!next) return;
 
+      const span = next.stage - stage;
+
       ScrollTrigger.create({
-        trigger: section,
+        trigger: el,
         start: "center center",
-        endTrigger: next,
+        endTrigger: next.el,
         end: "center center",
         scrub: true,
-        onUpdate: (self) => field.setProgress(i + self.progress),
+        onUpdate: (self) => field.setProgress(stage + self.progress * span),
       });
     });
 
@@ -184,7 +192,13 @@ function bindScene(main) {
 
   // Detail and list pages hold a single shape, easing over from whatever the
   // previous page left behind so navigation reads as one continuous scene.
-  const stage = Number(main.dataset.sceneStage ?? 2);
+  //
+  // `data-scene-stage` is a particle *shape* index — 2 is the grid, and one
+  // shape is no more finished than another. The elemental scenes read the same
+  // axis as how far through their own destruction they are, so the same number
+  // would leave every detail page sitting permanently half-eroded. They
+  // declare a resting stage of their own and ignore the page's.
+  const stage = field.restStage ?? Number(main.dataset.sceneStage ?? 2);
   const from = { value: field.progress };
 
   field.setOpacity(0.8);

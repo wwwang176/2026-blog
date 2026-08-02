@@ -8,3 +8,6 @@ Thumbs.db
 
 # playwright-cli scratch output
 .playwright-cli/
+
+# Cygwin/MSYS crash dumps
+*.stackdump

@@ -61,6 +61,13 @@ export default class VolumetricFire {
     this.baseOpacity = 1;
     this.disposed = false;
 
+    // Where the scene sits on pages that are not the scroll narrative. Below
+    // the disperse floor of 1.4 and below the 1.2 the drift starts at, so a
+    // detail page gets the flame burning and standing still rather than one
+    // frozen midway through letting go — which is what reading the page's own
+    // stage number gave, that number meaning a particle shape and nothing here.
+    this.restStage = 0.9;
+
     // The dominant cost by far. Every step is two fbm evaluations and an SDF,
     // so this is the first thing to give on a weak device.
     // Warping the sample rather than eroding the threshold gives a crisper
