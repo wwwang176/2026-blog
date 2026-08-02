@@ -18,6 +18,7 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 
 import { buildMonogramGeometry, sampleSurface } from "./monogram-geometry.js";
+import { fitScale } from "./monogram-sdf.js";
 import {
   grainFragment,
   grainVertex,
@@ -304,9 +305,15 @@ export default class GranularField {
     const h = window.innerHeight;
     const aspect = w / h;
 
+    const camZ = aspect < 1 ? 23 + (1 - aspect) * 14 : 23;
+
     this.material.uniforms.uAspect.value = aspect;
-    this.material.uniforms.uCamZ.value = aspect < 1 ? 23 + (1 - aspect) * 14 : 23;
-    this.material.uniforms.uScale.value = aspect < 1 ? 1.7 : 2.4;
+    this.material.uniforms.uCamZ.value = camZ;
+    this.material.uniforms.uScale.value = fitScale(
+      aspect,
+      camZ,
+      this.material.uniforms.uTanHalfFov.value
+    );
 
     const base = Math.min(window.devicePixelRatio || 1, 2);
     this.renderScale = Math.min(

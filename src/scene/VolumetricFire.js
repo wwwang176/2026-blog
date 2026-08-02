@@ -18,6 +18,7 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 
 import { buildMonogramGeometry, sampleSurface } from "./monogram-geometry.js";
+import { fitScale } from "./monogram-sdf.js";
 import {
   emberFragment,
   emberVertex,
@@ -268,12 +269,20 @@ export default class VolumetricFire {
     const h = window.innerHeight;
     const aspect = w / h;
 
+    const camZ = aspect < 1 ? 23 + (1 - aspect) * 14 : 23;
+
     this.material.uniforms.uAspect.value = aspect;
-    this.material.uniforms.uCamZ.value = aspect < 1 ? 23 + (1 - aspect) * 14 : 23;
-    // Lower than the mesh scenes used, because the density field grows well
-    // beyond the letterform it is shaped from — the plume is part of the
-    // footprint and has to be inside the frame too.
-    this.material.uniforms.uScale.value = aspect < 1 ? 1.25 : 1.75;
+    this.material.uniforms.uCamZ.value = camZ;
+    // A smaller share of the frame than the other two ask for, because the
+    // density field grows well beyond the letterform it is shaped from — the
+    // plume is part of the footprint, and while its top is allowed off the
+    // frame the flame around the letters is not.
+    this.material.uniforms.uScale.value = fitScale(
+      aspect,
+      camZ,
+      this.material.uniforms.uTanHalfFov.value,
+      { fill: 0.71, cap: 0.53 }
+    );
 
     const base = Math.min(window.devicePixelRatio || 1, 2);
     // The floor is not about the silhouette, which a volume does not really

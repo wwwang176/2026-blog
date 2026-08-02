@@ -18,6 +18,10 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 
 import { buildDroplets } from "./monogram-centreline.js";
+// The only thing this scene takes from there. It derives the letterform from
+// centrelines rather than from the distance field, but how big the letterform
+// is on screen is a fact about the mark, not about how a scene draws it.
+import { fitScale } from "./monogram-sdf.js";
 import { GROUP_SIZE, buildLiquidFragment, liquidVertex } from "./liquid-shaders.js";
 
 /** Deterministic PRNG so the droplets ring identically on every load. */
@@ -404,12 +408,18 @@ export default class LiquidField {
     const h = window.innerHeight;
     const aspect = w / h;
 
+    const camZ = aspect < 1 ? 23 + (1 - aspect) * 14 : 23;
+
     this.material.uniforms.uAspect.value = aspect;
-    this.material.uniforms.uCamZ.value = aspect < 1 ? 23 + (1 - aspect) * 14 : 23;
-    // Larger than the fire's, because there is no plume here — the mark is the
-    // whole footprint, so it can be sized to the frame rather than to the
+    this.material.uniforms.uCamZ.value = camZ;
+    // Nearly the whole width, because there is no plume here — the mark is the
+    // entire footprint, so it can be sized to the frame rather than to the
     // headroom something rising off it needs.
-    this.material.uniforms.uScale.value = aspect < 1 ? 1.7 : 2.4;
+    this.material.uniforms.uScale.value = fitScale(
+      aspect,
+      camZ,
+      this.material.uniforms.uTanHalfFov.value
+    );
 
     const base = Math.min(window.devicePixelRatio || 1, 2);
     this.renderScale = Math.min(

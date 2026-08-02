@@ -59,6 +59,41 @@ export const MONOGRAM_SDF = /* glsl */ `
 `;
 
 /**
+ * How much of the frame the mark actually occupies, in local units.
+ *
+ * The outline itself is 5.55 by 2.0 — the C sits at -1.775 with an outer
+ * radius of 1.0 and the period at 2.545 with a radius of 0.23, and the W is
+ * cut flat at ±1.0. What each scene draws is wider than that: the sand's
+ * strata, fluting and pockets move its surface by up to 0.23 and its body is
+ * rounded by another 0.10, and the liquid's blend swells the union outward by
+ * most of its own width. Sizing against the outline put the period off the
+ * right edge on a 16:9 frame, so the number here is the drawn extent with
+ * that relief in it.
+ *
+ * Here rather than in each scene for the reason the distance field is here —
+ * three renderers sizing the same letterform must not disagree about how big
+ * it is.
+ */
+export const MARK_EXTENT = { width: 6.2, height: 2.6 };
+
+/**
+ * Local units per world unit, so that the mark fills `fill` of the frame's
+ * width without passing `cap` of its height.
+ *
+ * Derived rather than written down. The numbers it replaced were a pair of
+ * constants with an `aspect < 1` branch, which held only at the shape of
+ * window they were chosen at: on a tall phone they put the mark half a
+ * letter wider than the frame, and the C lost its left edge.
+ */
+export function fitScale(aspect, camZ, tanHalfFov, { fill = 0.97, cap = 0.72 } = {}) {
+  const height = camZ * tanHalfFov * 2;
+  return Math.min(
+    (height * aspect * fill) / MARK_EXTENT.width,
+    (height * cap) / MARK_EXTENT.height
+  );
+}
+
+/**
  * Value noise and fbm.
  *
  * Shared for the same reason: two renderers wanting the same grain want the
