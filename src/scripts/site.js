@@ -20,12 +20,13 @@ gsap.registerPlugin(ScrollTrigger);
 
 const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-let field = null;
+let director = null;
 let lenis = null;
 let started = false;
 let firstLoad = true;
 let clockTimer = null;
-let scenePromise = null;
+let directorPromise = null;
+let bootPromise = null;
 let sceneSettled = false;
 
 /* ── Capability checks ────────────────────────────────────── */
@@ -55,11 +56,12 @@ function pickQuality() {
  */
 function applyBodyState() {
   const cl = document.body.classList;
+  const live = Boolean(director?.active);
   cl.toggle("reduced-motion", prefersReduced);
-  cl.toggle("webgl-ready", Boolean(field));
-  // Only fall back once the scene has actually settled — the three.js chunk
-  // loads asynchronously, so an absent field early on isn't a failure.
-  cl.toggle("webgl-fallback", sceneSettled && !field);
+  cl.toggle("webgl-ready", live);
+  // Only fall back once a scene has actually settled — the three.js chunk
+  // loads asynchronously, so an absent scene early on isn't a failure.
+  cl.toggle("webgl-fallback", sceneSettled && !live);
 }
 
 /* ── One-time boot ────────────────────────────────────────── */
@@ -79,45 +81,67 @@ function startOnce() {
 /**
  * three.js is by far the heaviest thing on the site, and nothing on the page
  * depends on it to be readable — so it loads as a separate chunk rather than
- * blocking first paint. The canvas is left in the DOM either way; CSS keeps it
- * at opacity 0 until `webgl-ready` is set.
+ * blocking first paint. The container is left in the DOM either way; CSS keeps
+ * it at opacity 0 until `webgl-ready` is set.
+ *
+ * Only the director itself is loaded here. Which scene it builds, and the
+ * three.js chunk that comes with it, waits until a page asks for one.
  */
-function startScene() {
-  if (scenePromise) return scenePromise;
+function startDirector() {
+  if (directorPromise) return directorPromise;
 
-  const canvas = document.getElementById("webgl");
+  const container = document.getElementById("webgl");
 
-  if (!canvas || prefersReduced || !supportsWebGL()) {
+  if (!container || prefersReduced || !supportsWebGL()) {
     sceneSettled = true;
-    scenePromise = Promise.resolve(null);
-    return scenePromise;
+    directorPromise = Promise.resolve(null);
+    return directorPromise;
   }
 
-  scenePromise = import("../scene/ParticleField.js")
-    .then(({ default: ParticleField }) => {
-      field = new ParticleField(canvas, { quality: pickQuality() });
+  directorPromise = import("../scene/SceneDirector.js")
+    .then(({ default: SceneDirector }) => {
+      director = new SceneDirector(container, { quality: pickQuality() });
       attachSceneListeners();
-      return field;
+      return director;
     })
     .catch((err) => {
-      console.warn("Particle field unavailable, falling back to gradient.", err);
-      field = null;
+      console.warn("Scene director unavailable, falling back to gradient.", err);
+      director = null;
+      return null;
+    });
+
+  return directorPromise;
+}
+
+/**
+ * Bring up whichever scene this page asked for, building it on first use.
+ *
+ * Resolves to `{ field, changed }`, or null if there is no scene at all.
+ */
+function showScene(name) {
+  return startDirector()
+    .then((d) => (d ? d.show(name) : null))
+    .catch((err) => {
+      console.warn("Scene unavailable, falling back to gradient.", err);
       return null;
     })
     .finally(() => {
       sceneSettled = true;
       applyBodyState();
     });
-
-  return scenePromise;
 }
 
+/**
+ * Attached once, for every scene there will ever be. The director holds which
+ * one is on screen; nothing here closes over a particular scene, because a
+ * navigation can replace it.
+ */
 function attachSceneListeners() {
   let hidden = false;
 
   gsap.ticker.add((_time, deltaMS) => {
     if (hidden) return;
-    field.tick(Math.min(deltaMS, 50) / 1000);
+    director.tick(Math.min(deltaMS, 50) / 1000);
   });
 
   document.addEventListener("visibilitychange", () => {
@@ -126,7 +150,7 @@ function attachSceneListeners() {
 
   window.addEventListener("pointermove", (e) => {
     if (e.pointerType === "touch") return;
-    field.setPointer(
+    director.setPointer(
       (e.clientX / window.innerWidth) * 2 - 1,
       -((e.clientY / window.innerHeight) * 2 - 1)
     );
@@ -134,7 +158,7 @@ function attachSceneListeners() {
 
   let resizeTimer;
   window.addEventListener("resize", () => {
-    field.resize();
+    director.resize();
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => ScrollTrigger.refresh(), 200);
   });
@@ -147,10 +171,15 @@ function attachSceneListeners() {
  *   scroll  — sections drive uProgress (the landing page)
  *   static  — hold one stage, set by `data-scene-stage`
  */
-function bindScene(main) {
+function bindScene(main, field, changed) {
   if (!field || !main) return;
 
   if (main.dataset.scene === "scroll") {
+    // Detail pages dim the scene and nothing here was putting it back, so
+    // arriving from one left the landing page at four fifths until the contact
+    // trigger happened to fire.
+    field.setOpacity(1);
+
     // `data-stage` is the progress value the field holds at that section's
     // centre, not just a sort key. It used to be the latter and the progress
     // came from the array index, which meant a section could only be inserted
@@ -199,9 +228,22 @@ function bindScene(main) {
   // would leave every detail page sitting permanently half-eroded. They
   // declare a resting stage of their own and ignore the page's.
   const stage = field.restStage ?? Number(main.dataset.sceneStage ?? 2);
-  const from = { value: field.progress };
 
   field.setOpacity(0.8);
+
+  // Across a change of scene there is nothing to be continuous with, and the
+  // cross-fade is already covering the discontinuity. Easing the incoming one
+  // from wherever the outgoing one was left would have it arriving out of a
+  // state it never occupied — scrolling the landing page down to contact and
+  // then opening a work would have started the sand fully blown away and
+  // reassembled it.
+  if (changed) {
+    field.setProgress(stage);
+    return;
+  }
+
+  const from = { value: field.progress };
+
   gsap.to(from, {
     value: stage,
     duration: 1.4,
@@ -485,11 +527,16 @@ function setupPage() {
 
   ScrollTrigger.refresh();
 
-  // The field loads asynchronously, so its triggers are bound whenever it
+  // Pages name their scene; anything that does not gets the particle field,
+  // so a page can be moved over one at a time.
+  const shown = showScene(main?.dataset.element ?? "particles");
+  if (!bootPromise) bootPromise = shown;
+
+  // The scene loads asynchronously, so its triggers are bound whenever it
   // lands — unless the visitor has already navigated on.
-  startScene().then(() => {
-    if (token !== pageToken) return;
-    bindScene(main);
+  shown.then((result) => {
+    if (token !== pageToken || !result) return;
+    bindScene(main, result.field, result.changed);
     ScrollTrigger.refresh();
   });
 }
@@ -512,7 +559,7 @@ document.addEventListener("astro:page-load", () => {
   setupPage();
 
   if (isFirst) {
-    runLoader({ reduced: prefersReduced, waitFor: [startScene()] }).then(() => {
+    runLoader({ reduced: prefersReduced, waitFor: [bootPromise ?? startDirector()] }).then(() => {
       // Marks the session as booted; CSS uses this to keep the loader markup
       // hidden on every subsequent page.
       document.documentElement.dataset.visited = "";

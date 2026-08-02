@@ -83,6 +83,13 @@ a {
 
 /* ── Backdrop layers ────────────────────────────────────── */
 
+/*
+ * A container, not the canvas. Each scene owns a canvas of its own and the
+ * two overlap while one crosses to the next, so there are two opacities here
+ * doing unrelated jobs: this one reveals the backdrop once WebGL has come up
+ * at all, the one on the canvases below crosses between scenes. They multiply,
+ * which is exactly what is wanted — neither has to know about the other.
+ */
 .webgl {
   position: fixed;
   inset: 0;
@@ -96,6 +103,21 @@ a {
 }
 
 body.webgl-ready .webgl {
+  opacity: 1;
+}
+
+/* The duration is mirrored by FADE_MS in SceneDirector.js. */
+.webgl canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.2s linear;
+}
+
+.webgl canvas.is-visible {
   opacity: 1;
 }
 

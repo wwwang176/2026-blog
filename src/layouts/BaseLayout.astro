@@ -73,9 +73,13 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
 
     <!--
       transition:persist keeps this exact DOM node across navigations, so the
-      WebGL context is never torn down and the particle field keeps running.
+      WebGL contexts inside it are never torn down and the scene keeps running.
+
+      A container rather than the canvas itself: each scene owns a canvas of
+      its own, and crossing from one to the next puts both on screen at once.
+      SceneDirector mounts and hides them.
     -->
-    <canvas class="webgl" id="webgl" aria-hidden="true" transition:persist="webgl"></canvas>
+    <div class="webgl" id="webgl" aria-hidden="true" transition:persist="webgl"></div>
     <div class="fallback-bg" aria-hidden="true" transition:persist="fallback"></div>
     <div class="grain" aria-hidden="true" transition:persist="grain"></div>
 
