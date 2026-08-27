@@ -218,14 +218,35 @@ function driveHomeBands(field) {
   let asked = HOME_BANDS[0];
   let live = { field, band: asked };
 
+  // The last values the page asked for, which is what an incoming scene has
+  // to be given. Everything below writes to whichever scene is live at the
+  // time, and a scene that arrives after the scroll has stopped never gets
+  // written to at all — see the note where they are applied.
+  let latest = 0;
+  let latestOpacity = 1;
+
   return {
     setProgress(p) {
+      latest = p;
       const next = bandAt(p);
 
       if (next !== asked) {
         asked = next;
         showScene(next.name).then((r) => {
-          if (r && asked === next) live = { field: r.field, band: next };
+          if (r && asked === next) {
+            live = { field: r.field, band: next };
+
+            // Hand it the state the page is actually in. Swapping a scene is
+            // asynchronous, so the line below this block is still writing to
+            // the outgoing one while the crossing resolves — and if the
+            // scroll has stopped in the meantime, no further call is coming
+            // and the incoming scene would hold the pose it was constructed
+            // at. Scrolling to the bottom in one gesture and letting go put
+            // the sand on screen at the start of its own life rather than
+            // three quarters of the way through it.
+            live.field.setProgress(arcAt(next, latest));
+            live.field.setOpacity(latestOpacity);
+          }
         });
       }
 
@@ -241,9 +262,67 @@ function driveHomeBands(field) {
     },
 
     setOpacity(v) {
+      latestOpacity = v;
       live.field.setOpacity(v);
     },
   };
+}
+
+/** The idle chain runs once a session; the scenes it builds are kept. */
+let homeScenesQueued = false;
+
+/**
+ * Build the rest of the sequence while the thread has nothing else to do.
+ *
+ * The threshold prebuild in driveHomeBands opens its window part of the way
+ * into the previous band, which is enough lead for the water and not enough
+ * for the sand. Two things take it away. The water's band is half the width
+ * of the fire's, so the same fraction buys half the run-up; and the window
+ * opens later than the threshold says, because the scroll is only sampled
+ * where it happens to land — measured, the sand's window was asked for at
+ * 1.7625 and first actually opened at 2.08, against a handover at 2.36.
+ *
+ * The sand is also the most expensive of the three to reach: the only one
+ * that scatters a hundred and ten thousand grains, and the third GL context
+ * to be created. So the costliest build was given the shortest run-up, and a
+ * scroll that crosses the water in one gesture — or a machine a few times
+ * slower — leaves it unfinished when the handover comes. The build blocks the
+ * main thread for its whole length, which is why what this looks like is not
+ * the sand arriving late but the water stopping dead.
+ *
+ * Idle time is where that cost belongs. Nothing is moving, and afterwards
+ * every crossing is the two-hundred millisecond fade whatever route the
+ * scroll took to get there.
+ */
+function prebuildHomeScenes() {
+  if (homeScenesQueued) return;
+  homeScenesQueued = true;
+
+  const queue = HOME_BANDS.map((b) => b.name);
+
+  // A build is around a tenth of a second and will not fit inside a frame's
+  // idle slice, so it overruns whenever it runs. The timeout decides what it
+  // overruns: during the hero's intro that would be a dropped frame nobody
+  // asked for, and three seconds is past the end of that timeline — by which
+  // point the thread is usually idle anyway and this has already happened.
+  const idle = (fn) =>
+    "requestIdleCallback" in window
+      ? requestIdleCallback(fn, { timeout: 3000 })
+      : setTimeout(fn, 600);
+
+  const step = () => {
+    const name = queue.shift();
+    if (!name) return;
+
+    // The scene the page opened on is already built, and prebuild's cheap
+    // path returns it — so this costs nothing for the first of the three.
+    startDirector()
+      .then((d) => d?.prebuild(name))
+      .catch(() => {})
+      .then(() => idle(step));
+  };
+
+  idle(step);
 }
 
 /**
@@ -263,6 +342,11 @@ function bindScene(main, field, changed) {
     // Standing in for a single scene: the landing page runs three of them in
     // sequence, and the triggers below should not have to know that.
     const scene = driveHomeBands(field);
+
+    // Take the other two off the scroll's critical path entirely. The
+    // threshold prebuild stays as the backstop for anything that scrolls
+    // before the thread ever goes idle.
+    prebuildHomeScenes();
 
     // `data-stage` is the progress value the field holds at that section's
     // centre, not just a sort key. It used to be the latter and the progress
@@ -311,23 +395,60 @@ function bindScene(main, field, changed) {
     // With three it made the sequence pick a different element several times a
     // frame, and every pick cancelled the crossing the last one had started,
     // so nothing changed until the scrolling stopped.
+    /**
+     * Put the sequence where the page already is.
+     *
+     * onUpdate is edge-triggered: it fires when the trigger's progress
+     * *changes*, and a page that was already scrolled when the trigger was
+     * created starts at that progress rather than arriving at it. So on a
+     * first load that was scrolled during the loader, setProgress was never
+     * called at all and the sequence sat on whatever the first band was —
+     * the fire, at the bottom of the page, until the scroll was nudged a
+     * pixel and the first real update came through.
+     *
+     * A refresh is also exactly when the mapping from scroll to progress can
+     * have moved, so the same sync belongs there. Deferred a frame because a
+     * global refresh restores scroll positions after the per-trigger
+     * callbacks have run, and reading it inside one can catch the position
+     * the measurement was taken at rather than the one the visitor is at.
+     */
+    const sync = () =>
+      requestAnimationFrame(() => scene.setProgress(progressAt(window.scrollY)));
+
+    // One trigger for the whole page rather than one per pair of sections.
+    // Each of those fired its own onUpdate on every scroll event, including
+    // the ones already clamped at 0 or 1, so the progress arrived several
+    // times a frame carrying different values. With a single scene that was
+    // invisible — the right value overwrote the wrong ones in the same frame.
+    // With three it made the sequence pick a different element several times a
+    // frame, and every pick cancelled the crossing the last one had started,
+    // so nothing changed until the scrolling stopped.
     ScrollTrigger.create({
       trigger: main,
       start: "top top",
       end: "max",
       scrub: true,
-      onRefresh: measure,
+      onRefresh: () => {
+        measure();
+        sync();
+      },
       onUpdate: (self) => scene.setProgress(progressAt(self.scroll())),
     });
 
     const contact = document.getElementById("contact");
     if (contact) {
-      ScrollTrigger.create({
+      // Edge-triggered for the same reason the sequence above was, and it
+      // needs the same initial value: a page already scrolled to the contact
+      // section when the trigger was created was never dimmed at all.
+      const dim = (self) => scene.setOpacity(1 - self.progress * 0.45);
+
+      const contactTrigger = ScrollTrigger.create({
         trigger: contact,
         start: "top 70%",
         end: "top 20%",
         scrub: true,
-        onUpdate: (self) => scene.setOpacity(1 - self.progress * 0.45),
+        onRefresh: () => requestAnimationFrame(() => dim(contactTrigger)),
+        onUpdate: dim,
       });
     }
     return;
