@@ -16,6 +16,7 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { SMAAPass } from "three/examples/jsm/postprocessing/SMAAPass.js";
 
 import { buildDroplets } from "./monogram-centreline.js";
 // The only thing this scene takes from there. It derives the letterform from
@@ -57,7 +58,6 @@ export default class LiquidField {
     this.pointer = new Vector2(0, 0);
     this.pointerTarget = new Vector2(0, 0);
     this.time = 0;
-    this.spin = 0;
     this.progress = 0;
     this.spread = 0;
     this.baseOpacity = 1;
@@ -92,15 +92,36 @@ export default class LiquidField {
     // Then down again by a fifth when the mark was sized to the frame. A
     // sphere trace pays per pixel that meets the surface, and at half again
     // the scale the mark covers a bit over twice the area — the water was the
-    // only one of the three that fell under the display's ceiling for it. All
-    // three tiers moved by the same fraction, so the ladder still means
-    // something.
-    this.pixelBudget = quality === "low" ? 223e3 : quality === "medium" ? 318e3 : 430e3;
+    // only one of the three that fell under the display's ceiling for it.
+    //
+    // And back up again, by a little over half, because 430e3 was not enough
+    // to carry this scene's edges. The silhouette was never the problem — the
+    // near-miss feather antialiases that, and it is measured against the
+    // buffer so it holds at any scale. What aliases is everything inside it.
+    // envColour is built out of hard-edged lobes on purpose, on the grounds
+    // that a smooth gradient in a curved surface reads as plastic and only a
+    // hard edge sliding across it reads as wet; and a hard edge is exactly
+    // what does not survive being rendered at a third of the display and
+    // scaled back up. At 1440p, 430e3 put the trace at 0.34 and every one of
+    // those edges through a 2.9x upscale. The low tier is left where it is —
+    // it exists for machines that cannot afford this, and the ladder is a
+    // ladder because the rungs are not the same distance apart.
+    //
+    // 700e3 was still not enough, so up again to a megapixel, which is where
+    // this stops: it is 1.5x what the fire and the sand together are allowed,
+    // and past here the honest answer is that a sphere trace cannot be run at
+    // native resolution on a large display and the remaining jaggedness has to
+    // be taken off by the SMAA pass rather than paid for. The lab's budget
+    // slider is the place to find the point on any particular machine — it
+    // reads out the derived scale beside the frame rate.
+    this.pixelBudget = quality === "low" ? 223e3 : quality === "medium" ? 560e3 : 1.0e6;
 
     // Derived in resize(). A surface has a silhouette and gives up resolution
     // far worse than the fire's volume did, so the ceiling is well above the
     // fire's 0.45 — but the near-miss feather is what makes the floor
-    // survivable on a very large display.
+    // survivable on a very large display. The ceiling is native now rather
+    // than 0.85: on a window small enough for the budget to reach it, there
+    // is nothing to be gained by rendering under the display it is shown on.
     this.renderScale = 0.7;
 
     // Cohesion at rest, and the one number that decides whether this reads as
@@ -273,6 +294,25 @@ export default class LiquidField {
     );
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
+
+    /**
+     * After the output pass, not before it.
+     *
+     * SMAA decides what is an edge by comparing neighbouring colours against a
+     * fixed threshold, which only means anything once the values are the ones
+     * that will be displayed. Run against the composer's half-float buffer it
+     * is reading pre-tone-map numbers and its threshold lands somewhere
+     * arbitrary — worst exactly where this scene needs it, because a specular
+     * on water is several times white before the curve pulls it back.
+     *
+     * It runs at the rendered size rather than the display's, so what it is
+     * smoothing is the buffer's own stair-stepping before that gets scaled up.
+     * That is the right place for it: the jaggedness is made at the render and
+     * magnified by the upscale, and there is nothing to fix afterwards that
+     * was not already lost.
+     */
+    this.smaa = new SMAAPass();
+    this.composer.addPass(this.smaa);
   }
 
   /**
@@ -399,9 +439,18 @@ export default class LiquidField {
       this.baseOpacity * (1 - range(value, ...STAGE.fadeOut));
   }
 
-  /** Normalised pointer offset, roughly -1 → 1 on each axis. */
-  setPointer(x, y) {
+  /**
+   * Normalised pointer offset, roughly -1 → 1 on each axis.
+   *
+   * `immediate` snaps the eased value to it as well, which is what a scene
+   * arriving at a crossing needs. Only the visible scene is ticked, so an
+   * incoming one has not eased since the pointer last moved and would come in
+   * from wherever it was left — the mark swinging into place over the second
+   * after the fade rather than being handed over already facing the right way.
+   */
+  setPointer(x, y, immediate = false) {
     this.pointerTarget.set(x, y);
+    if (immediate) this.pointer.copy(this.pointerTarget);
   }
 
   /** Multiplier against the scene's resting opacity, not an absolute value. */
@@ -430,7 +479,7 @@ export default class LiquidField {
 
     const base = Math.min(window.devicePixelRatio || 1, 2);
     this.renderScale = Math.min(
-      0.85,
+      1,
       Math.max(0.28, Math.sqrt(this.pixelBudget / (w * h * base * base)))
     );
 
@@ -464,12 +513,12 @@ export default class LiquidField {
 
     this.pointer.lerp(this.pointerTarget, 0.045);
 
-    const freed = range(this.progress, 1.2, 2.2);
-    this.spin += dt * 0.09 * freed;
-
+    // Pointer only, and the same expression in all three — see the note in
+    // VolumetricFire.tick for what the drift term it replaces was doing to
+    // the handover.
     this.material.uniforms.uRot.value.set(
       this.pointer.y * -0.35,
-      this.spin + this.pointer.x * 0.14
+      this.pointer.x * 0.14
     );
 
     this.composer.render();
@@ -480,6 +529,7 @@ export default class LiquidField {
     this.quadGeometry.dispose();
     this.material.dispose();
     this.bloom.dispose();
+    this.smaa.dispose();
     this.composer.dispose();
     this.renderer.dispose();
   }

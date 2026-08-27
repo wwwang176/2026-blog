@@ -257,6 +257,25 @@ import "../../styles/main.css";
         ["streak", 1, 10, 0.1,
           () => field.grainMaterial.uniforms.uStreak.value,
           (v) => { field.grainMaterial.uniforms.uStreak.value = v; }],
+        // The two roundings. `join` is the smooth union inside the W, which is
+        // the only thing that reaches its valleys and its apex — they are
+        // concave, and an offset cannot touch a concave corner however far it
+        // is pushed. `round` is that offset, and what it rolls is the extruded
+        // edge and the C's two radial terminals. Against a stroke half-width
+        // of 0.23, join much past 0.16 starts closing the W's counters.
+        ["join", 0, 0.2, 0.005,
+          () => field.material.uniforms.uJoin.value,
+          (v) => { field.material.uniforms.uJoin.value = v; }],
+        ["round", 0, 0.3, 0.005,
+          () => field.material.uniforms.uRound.value,
+          (v) => { field.material.uniforms.uRound.value = v; }],
+        // Both of the above add mass, so this is how it comes off again.
+        // Positive is thinner. Raise it alongside join and round to keep the
+        // stroke weight while the corners soften; raise it on its own to make
+        // the whole mark sit lighter.
+        ["weight", -0.05, 0.16, 0.005,
+          () => field.material.uniforms.uWeight.value,
+          (v) => { field.material.uniforms.uWeight.value = v; }],
         // Megapixels, not a fraction of the window — the fraction is derived
         // from this and is what the readout below shows. Stated this way the
         // number means the same thing on every display.

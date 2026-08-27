@@ -161,9 +161,18 @@ export default class ParticleField {
     this.material.uniforms.uProgress.value = value;
   }
 
-  /** Normalised pointer offset, roughly -1 → 1 on each axis. */
-  setPointer(x, y) {
+  /**
+   * Normalised pointer offset, roughly -1 → 1 on each axis.
+   *
+   * `immediate` snaps the eased value to it as well, which is what a scene
+   * arriving at a crossing needs. Only the visible scene is ticked, so an
+   * incoming one has not eased since the pointer last moved and would come in
+   * from wherever it was left — the mark swinging into place over the second
+   * after the fade rather than being handed over already facing the right way.
+   */
+  setPointer(x, y, immediate = false) {
     this.pointerTarget.set(x, y);
+    if (immediate) this.pointer.copy(this.pointerTarget);
   }
 
   /** Multiplier against the field's resting opacity, not an absolute value. */

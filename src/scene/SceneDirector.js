@@ -44,6 +44,11 @@ export default class SceneDirector {
     // Navigation can outrun a build. Anything that resolves against a stale
     // token has been overtaken and must not touch what is on screen.
     this.token = 0;
+
+    // Where the pointer was last seen. Only the visible scene is told about
+    // it, so this is what an incoming one has to be caught up with.
+    this.pointerX = 0;
+    this.pointerY = 0;
   }
 
   /**
@@ -74,6 +79,12 @@ export default class SceneDirector {
 
     const outgoing = this.built.get(this.activeName);
     const changed = this.activeName !== null;
+
+    // Face the way the mark on screen is facing. All three read the pointer
+    // through the same expression, so given the same value they agree — but
+    // the incoming one has not been ticked since the pointer last moved, and
+    // easing in from where it was left would turn the mark through the fade.
+    entry.field.setPointer(this.pointerX, this.pointerY, true);
 
     entry.canvas.style.display = "block";
     // Force a layout so the browser has a frame at opacity 0 to leave from.
@@ -215,6 +226,8 @@ export default class SceneDirector {
   }
 
   setPointer(x, y) {
+    this.pointerX = x;
+    this.pointerY = y;
     if (this.active) this.active.setPointer(x, y);
   }
 

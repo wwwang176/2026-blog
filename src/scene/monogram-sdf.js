@@ -32,25 +32,71 @@ export const MONOGRAM_SDF = /* glsl */ `
     return sdArc(q, vec2(0.78801, -0.61566), 0.77, 0.23);
   }
 
-  float sdW(vec2 p) {
+  /**
+   * Smooth min and max, for renderers that want the letterform's joins
+   * rounded rather than mitred.
+   *
+   * Offsetting a distance field outward — the "- r" every rounded extrusion
+   * ends with — rounds convex corners and does nothing at all to concave
+   * ones. The W is mostly concave: the two valleys and the middle apex are
+   * where its strokes meet from the inside, and no amount of offset touches
+   * them. Rounding those needs the union itself to be smooth.
+   */
+  float sminK(float a, float b, float k) {
+    k = max(k, 1e-4);
+    float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+    return mix(b, a, h) - k * h * (1.0 - h);
+  }
+
+  float smaxK(float a, float b, float k) {
+    return -sminK(-a, -b, k);
+  }
+
+  /**
+   * The W, with k of rounding at every join and at the cut.
+   *
+   * A k of zero is the mitred original to within a ten-thousandth, so this is
+   * the only W and the sharp one is a call with nothing asked for. Two
+   * renderers disagreeing about where the strokes run is the thing this file
+   * exists to prevent, and a second copy of the coordinates would be exactly
+   * that.
+   */
+  float sdWK(vec2 p, float k) {
     float d = sdCapsule(p, vec2(-1.02, 1.45), vec2(-0.54, -1.30), 0.23);
-    d = min(d, sdCapsule(p, vec2(-0.54, -1.30), vec2(0.0, 0.58), 0.23));
-    d = min(d, sdCapsule(p, vec2(0.0, 0.58), vec2(0.54, -1.30), 0.23));
-    d = min(d, sdCapsule(p, vec2(0.54, -1.30), vec2(1.02, 1.45), 0.23));
+    d = sminK(d, sdCapsule(p, vec2(-0.54, -1.30), vec2(0.0, 0.58), 0.23), k);
+    d = sminK(d, sdCapsule(p, vec2(0.0, 0.58), vec2(0.54, -1.30), 0.23), k);
+    d = sminK(d, sdCapsule(p, vec2(0.54, -1.30), vec2(1.02, 1.45), 0.23), k);
     // The centreline runs past the cap line and below the baseline so the
-    // terminals and valleys cut flat instead of square to the diagonals.
-    return max(d, abs(p.y) - 1.0);
+    // terminals and valleys cut flat instead of square to the diagonals. The
+    // cut is smoothed by the same k, which is what takes the chisel off the
+    // four terminals.
+    return smaxK(d, abs(p.y) - 1.0, k);
+  }
+
+  float sdW(vec2 p) {
+    return sdWK(p, 0.0);
   }
 
   // Authored at C -2.3 / W 0.35 / period 2.02, spanning -3.3 to 2.25, so the
   // centring offset is +0.525. Subtracting it instead threw the whole mark a
   // letter-width to the left.
-  /** The outline only, with no depth — negative anywhere inside the letters. */
-  float sdOutline(vec2 q) {
+  /**
+   * The outline only, with no depth — negative anywhere inside the letters.
+   *
+   * The letters are combined with a plain min whatever k is. They stand well
+   * over a stroke apart, so a smooth union between them would never fire; the
+   * rounding is a fact about how one letter's own strokes meet, not about how
+   * the three sit together.
+   */
+  float sdOutlineK(vec2 q, float k) {
     float d = sdC(q - vec2(-1.775, 0.0));
-    d = min(d, sdW(q - vec2(0.875, 0.0)));
+    d = min(d, sdWK(q - vec2(0.875, 0.0), k));
     d = min(d, length(q - vec2(2.545, -0.77)) - 0.23);
     return d;
+  }
+
+  float sdOutline(vec2 q) {
+    return sdOutlineK(q, 0.0);
   }
 
   float sdMonogram(vec3 p) {
@@ -65,10 +111,17 @@ export const MONOGRAM_SDF = /* glsl */ `
  * radius of 1.0 and the period at 2.545 with a radius of 0.23, and the W is
  * cut flat at ±1.0. What each scene draws is wider than that: the sand's
  * strata, fluting and pockets move its surface by up to 0.23 and its body is
- * rounded by another 0.10, and the liquid's blend swells the union outward by
+ * rounded by another 0.13, and the liquid's blend swells the union outward by
  * most of its own width. Sizing against the outline put the period off the
  * right edge on a 16:9 frame, so the number here is the drawn extent with
  * that relief in it.
+ *
+ * The sand's rounding has since gone from 0.10 to 0.13, which puts its widest
+ * possible relief three hundredths past what this allows for. Left alone
+ * rather than moved to 6.27: fitScale already holds the mark to 97% of the
+ * frame, so there is a good deal more margin than that in hand, and the
+ * number is shared — moving it to suit the sand would shrink the fire and the
+ * water by a percent for a reason that has nothing to do with either.
  *
  * Here rather than in each scene for the reason the distance field is here —
  * three renderers sizing the same letterform must not disagree about how big

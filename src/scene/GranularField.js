@@ -57,7 +57,6 @@ export default class GranularField {
     this.pointer = new Vector2(0, 0);
     this.pointerTarget = new Vector2(0, 0);
     this.time = 0;
-    this.spin = 0;
     this.progress = 0;
 
     // Integrated, not derived from time and the current speed. Anything that
@@ -137,6 +136,27 @@ export default class GranularField {
         // for the light to fall off across it; at the fire's thickness the
         // strokes read as ribbon.
         uDepth: { value: 0.30 },
+        // How far the W's own strokes blend into one another where they meet,
+        // and how far the flat cut at the cap line and the baseline is rolled
+        // into them. Against a stroke half-width of 0.23 this is most of the
+        // way to a fillet — enough that the valleys and the apex read as worn
+        // rather than cut, which is what sand does to a corner. Past about
+        // 0.16 the two inner diagonals start pulling into each other and the
+        // counters close up.
+        uJoin: { value: 0.11 },
+        // The offset rounding on the extrusion, which is also what rolls the
+        // C's two radial terminals. Up from 0.10 — the mark reads as sand
+        // everywhere else and those were the last square edges on it.
+        uRound: { value: 0.13 },
+        // Inset on the outline, paying back what the two roundings above put
+        // on. uRound went up by 0.03 and it dilates on every side; uJoin fills
+        // the W's valleys by up to a quarter of itself. Together that is a bit
+        // under 0.06 of added mass at the joins and 0.03 everywhere else, and
+        // the W came out visibly swollen — the counters closed and the whole
+        // mark read heavier than the fire and the water it hands over from.
+        // 0.055 takes that back and a little more, so the strokes sit slightly
+        // under where they started while keeping the rounding that cost it.
+        uWeight: { value: 0.055 },
         // Frequency against amplitude is the whole texture. High and shallow
         // is dry fine sand; low and deep is gravel.
         uGrainFreq: { value: 44 },
@@ -289,9 +309,18 @@ export default class GranularField {
       this.baseOpacity * (1 - range(value, ...STAGE.fadeOut));
   }
 
-  /** Normalised pointer offset, roughly -1 → 1 on each axis. */
-  setPointer(x, y) {
+  /**
+   * Normalised pointer offset, roughly -1 → 1 on each axis.
+   *
+   * `immediate` snaps the eased value to it as well, which is what a scene
+   * arriving at a crossing needs. Only the visible scene is ticked, so an
+   * incoming one has not eased since the pointer last moved and would come in
+   * from wherever it was left — the mark swinging into place over the second
+   * after the fade rather than being handed over already facing the right way.
+   */
+  setPointer(x, y, immediate = false) {
     this.pointerTarget.set(x, y);
+    if (immediate) this.pointer.copy(this.pointerTarget);
   }
 
   /** Multiplier against the scene's resting opacity, not an absolute value. */
@@ -364,12 +393,13 @@ export default class GranularField {
 
     this.pointer.lerp(this.pointerTarget, 0.045);
 
-    const freed = range(this.progress, 1.2, 2.2);
-    this.spin += dt * 0.09 * freed;
-
+    // Pointer only, and the same expression in all three — see the note in
+    // VolumetricFire.tick. This is the scene the drift term actually reached,
+    // and the one that was turning on its own while the other two stood
+    // still.
     this.material.uniforms.uRot.value.set(
       this.pointer.y * -0.35,
-      this.spin + this.pointer.x * 0.14
+      this.pointer.x * 0.14
     );
 
     this.composer.render();

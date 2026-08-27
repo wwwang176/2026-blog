@@ -40,10 +40,40 @@ const SAND_SHAPE = /* glsl */ `
   uniform float uTime;
   uniform float uGrainPhase;
   uniform float uDustPhase;
+  uniform float uJoin;
+  uniform float uRound;
+  uniform float uWeight;
 
+  /**
+   * Two roundings and a weight, because rounding a letterform fattens it and
+   * the fattening has to be given back.
+   *
+   * uRound is the offset every rounded extrusion ends with. It rolls the
+   * convex edges — where the face meets the side wall, and the C's two radial
+   * terminals — and it cannot touch a concave corner, which is why the W's
+   * valleys and apex stayed mitred however far it was pushed. uJoin is the
+   * smooth union inside the W itself, and it is the one that takes the point
+   * off them.
+   *
+   * Both add mass. An offset is a dilation by definition, and a smooth union
+   * is under a plain one everywhere the two arguments are within k, so the
+   * joins fill. Raising the pair to round the W made the W heavier, its
+   * counters smaller, and the whole mark read as swollen — which is a fair
+   * description of what had been done to it. uWeight is a plain inset on the
+   * outline, so the strokes can be taken back in by whatever the two
+   * roundings put on, and past that if the mark wants to sit lighter.
+   *
+   * The order matters: the inset goes on the outline, before the extrusion is
+   * built and before the offset rounds it. Applied afterwards it would just
+   * cancel against uRound and nothing would be rounded at all.
+   *
+   * Only the sand asks for any of it. The fire's letterform is a source for a
+   * density field rather than something you look at, and the extra work in
+   * the union would be paid on every step of a march that never shows it.
+   */
   float sdBody(vec3 p) {
-    vec2 w = vec2(sdOutline(p.xy), abs(p.z) - uDepth);
-    return min(max(w.x, w.y), 0.0) + length(max(w, 0.0)) - 0.10;
+    vec2 w = vec2(sdOutlineK(p.xy, uJoin) + uWeight, abs(p.z) - uDepth);
+    return min(max(w.x, w.y), 0.0) + length(max(w, 0.0)) - uRound;
   }
 
   /** Where a point sits in the bedding sequence. */

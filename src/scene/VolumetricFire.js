@@ -57,7 +57,6 @@ export default class VolumetricFire {
     this.pointer = new Vector2(0, 0);
     this.pointerTarget = new Vector2(0, 0);
     this.time = 0;
-    this.spin = 0;
     this.progress = 0;
     this.baseOpacity = 1;
     this.disposed = false;
@@ -253,9 +252,18 @@ export default class VolumetricFire {
       this.baseOpacity * (1 - range(value, ...STAGE.fadeOut));
   }
 
-  /** Normalised pointer offset, roughly -1 → 1 on each axis. */
-  setPointer(x, y) {
+  /**
+   * Normalised pointer offset, roughly -1 → 1 on each axis.
+   *
+   * `immediate` snaps the eased value to it as well, which is what a scene
+   * arriving at a crossing needs. Only the visible scene is ticked, so an
+   * incoming one has not eased since the pointer last moved and would come in
+   * from wherever it was left — the mark swinging into place over the second
+   * after the fade rather than being handed over already facing the right way.
+   */
+  setPointer(x, y, immediate = false) {
     this.pointerTarget.set(x, y);
+    if (immediate) this.pointer.copy(this.pointerTarget);
   }
 
   /** Multiplier against the scene's resting opacity, not an absolute value. */
@@ -323,12 +331,16 @@ export default class VolumetricFire {
 
     this.pointer.lerp(this.pointerTarget, 0.045);
 
-    const freed = range(this.progress, 1.2, 2.2);
-    this.spin += dt * 0.09 * freed;
-
+    // Pointer only. There used to be a drift term here, ramped in over the
+    // same 1.2 → 2.2 the dispersal runs across, and on the landing page it
+    // reached exactly one of the three: the fire and the water are held at
+    // 1.2 by their bands and the sand's runs to 2.25, so the sand turned and
+    // the other two did not. What that cost was the handover — two scenes
+    // that share a pointer agree about where the mark faces, and one carrying
+    // an accumulated angle of its own does not.
     this.material.uniforms.uRot.value.set(
       this.pointer.y * -0.35,
-      this.spin + this.pointer.x * 0.14
+      this.pointer.x * 0.14
     );
 
     this.composer.render();
